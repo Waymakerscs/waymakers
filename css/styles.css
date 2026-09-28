@@ -7432,6 +7432,15 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   --emp: #107c10;
 }
 
+.well-busy-pill.well-busy-pill--private {
+  background-color: color-mix(in srgb, var(--emp, #8a96a3) 10%, #fff);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--emp, #8a96a3) 28%, transparent) 4px 6px
+  );
+}
+
 .well-busy-pill--clinic {
   --emp: #8a96a3;
   background: #f4f6f8;

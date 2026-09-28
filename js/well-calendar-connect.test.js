@@ -113,7 +113,12 @@ assert.strictEqual(jamesAfternoon.slots[0].time, "15:00");
 assert.ok(jamesAfternoon.held.some(function (h) { return h.title === "Procedure block" && h.employeeId === "emp-james"; }));
 assert.ok(jamesAfternoon.held.every(function (h) {
   var view = cc.presentForRole(h, "provider", "held");
-  return view.title === "" && JSON.stringify(view).indexOf("Procedure") < 0;
+  return (
+    view.title === "" &&
+    view.who === "" &&
+    JSON.stringify(view).indexOf("Procedure") < 0 &&
+    JSON.stringify(view).indexOf("James") < 0
+  );
 }));
 
 assert.deepEqual(cc.slotStarts("2026-09-27"), [], "Sunday is closed");
@@ -284,7 +289,8 @@ var patientBusy = cc.presentForRole(
 assert.strictEqual(patientBusy.label, "Busy");
 assert.strictEqual(patientBusy.title, "");
 assert.strictEqual(patientBusy.sourceLabel, "");
-assert.strictEqual(patientBusy.who, "Maya");
+assert.strictEqual(patientBusy.who, "");
+assert.ok(JSON.stringify(patientBusy).indexOf("Maya") < 0, "patient view leaked a staff short name");
 assert.ok(JSON.stringify(patientBusy).indexOf("Jordan") < 0, "patient view leaked a name");
 assert.ok(JSON.stringify(patientBusy).indexOf("Grand") < 0, "patient view leaked a subject");
 assert.ok(JSON.stringify(patientBusy).indexOf("CGN") < 0, "patient view leaked an MRN");
@@ -380,8 +386,9 @@ var providerNina = cc.presentForRole(
 assert.strictEqual(providerNina.owned, false);
 assert.strictEqual(providerNina.label, "Busy");
 assert.strictEqual(providerNina.title, "");
-assert.strictEqual(providerNina.who, "Nina");
+assert.strictEqual(providerNina.who, "");
 assert.strictEqual(providerNina.sourceLabel, "");
+assert.ok(JSON.stringify(providerNina).indexOf("Nina") < 0, "provider overlay leaked a staff short name");
 assert.ok(JSON.stringify(providerNina).indexOf("Sam") < 0);
 assert.ok(JSON.stringify(providerNina).indexOf("Procedure") < 0);
 assert.ok(JSON.stringify(providerNina).indexOf("Okonkwo") < 0);
@@ -399,9 +406,11 @@ assert.ok(mondayHeld.held.length > 0, "Maya Monday has a hold");
 mondayHeld.held.forEach(function (h) {
   var masked = cc.presentForRole(h, "patient", "held");
   assert.strictEqual(masked.title, "");
+  assert.strictEqual(masked.who, "");
   assert.strictEqual(masked.label, "Unavailable");
   assert.ok(JSON.stringify(masked).indexOf("huddle") < 0);
   assert.ok(JSON.stringify(masked).indexOf("Clinic") < 0);
+  assert.ok(JSON.stringify(masked).indexOf("Maya") < 0, "held row leaked a staff short name");
 });
 var mayaOwnedHold = cc.presentForRole(mondayHeld.held[0], "provider", "held");
 assert.strictEqual(mayaOwnedHold.owned, true);
