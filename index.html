@@ -474,7 +474,29 @@
             </div>
 
             <div role="tabpanel" id="panel-jobs" aria-labelledby="tab-jobs" hidden>
-              <div class="wm-empty-panel" data-empty-panel="jobs" aria-hidden="true"></div>
+              <div class="jobs-shell" data-jobs-shell>
+                <header class="jobs-intro">
+                  <h3 class="jobs-title">JOBS</h3>
+                  <p class="jobs-dek">Applicant board · apply to openings from local companies</p>
+                  <p class="jobs-role-note">Companies manage care work in WELL; openings to apply for live here.</p>
+                </header>
+
+                <div class="jobs-filter-row">
+                  <label class="jobs-sr-only" for="jobs-company">Filter by company</label>
+                  <select id="jobs-company" class="jobs-company" data-jobs-company aria-label="Filter by company"></select>
+                  <button type="button" class="jobs-clear" data-jobs-clear hidden>Clear filter</button>
+                  <span class="jobs-count" data-jobs-count aria-live="polite"></span>
+                </div>
+
+                <p class="jobs-filter-banner" data-jobs-filter-banner hidden></p>
+
+                <div class="jobs-book">
+                  <div class="jobs-results" data-jobs-results aria-label="Job openings"></div>
+                  <p class="jobs-empty" data-jobs-empty hidden>No openings match.</p>
+                </div>
+
+                <p class="jobs-footer-note">Demo openings · keyed by company id shared with WELL &amp; PAGES</p>
+              </div>
             </div>
           </div>
         </div>
@@ -501,8 +523,10 @@
   <script src="js/main.js" defer></script>
   <script src="js/login-signup-shell.js" defer></script>
   <script src="js/login.js" defer></script>
+  <script src="js/companies.js" defer></script>
   <script src="js/well.js" defer></script>
   <script src="js/well-auth.js" defer></script>
   <script src="js/pages.js" defer></script>
+  <script src="js/jobs.js" defer></script>
 </body>
 </html>

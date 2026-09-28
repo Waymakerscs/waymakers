@@ -33,30 +33,29 @@
   /**
    * Chicago-area flavored fictional/demo listings.
    * Fields: name, category, blurb, phone, neighborhood
-   * Optional claim fields: towerHandle, towerClaimed
+   * Optional: companyId — shared slug with JOBS posts (and WELL when offersWell).
    *
-   * Listings learn Tower identity only via an explicit claim/handle link
-   * (towerHandle and/or towerClaimed: true) — never by guessing from
-   * Doctor/Dentist category or inventing handles for every provider.
-   * Unclaimed rows show phone/neighborhood only (no Tower page, no IP call).
+   * PAGES is the local directory of what’s available. Listings with a companyId
+   * get a “View jobs” link into the JOBS tab filtered to that company.
+   * Tower / Commune / widgets are not wired here.
    */
   var DEMO_LISTINGS = [
     { name: "Ashland Avenue Barber Co.", category: "Barber", blurb: "Classic cuts, hot towel shaves, walk-ins welcome.", phone: "(773) 555-0142", neighborhood: "Lincoln Park" },
     { name: "Belmont Pet Emporium", category: "Pet store", blurb: "Food, toys, and weekend adoption events.", phone: "(773) 555-0198", neighborhood: "Lakeview" },
     { name: "Bridgeport Bloom Florist", category: "Florist", blurb: "Same-day bouquets and funeral arrangements.", phone: "(312) 555-0177", neighborhood: "Bridgeport" },
-    { name: "Bronzeville Family Dentistry", category: "Dentist", blurb: "Cleanings, crowns, and gentle care for kids.", phone: "(773) 555-0114", neighborhood: "Bronzeville", towerHandle: "bronzeville-dds", towerClaimed: true },
-    { name: "Clark Street Café", category: "Café", blurb: "Pour-overs, pastries, neighborhood Wi-Fi.", phone: "(312) 555-0160", neighborhood: "Andersonville" },
+    { name: "Bronzeville Family Dentistry", category: "Dentist", blurb: "Cleanings, crowns, and gentle care for kids.", phone: "(773) 555-0114", neighborhood: "Bronzeville", companyId: "bronzeville-family-dentistry" },
+    { name: "Clark Street Café", category: "Café", blurb: "Pour-overs, pastries, neighborhood Wi-Fi.", phone: "(312) 555-0160", neighborhood: "Andersonville", companyId: "clark-street-cafe" },
     { name: "Devon Spark Electric", category: "Electrician", blurb: "Panel upgrades, outlets, ceiling fans, licensed.", phone: "(773) 555-0133", neighborhood: "West Ridge" },
     { name: "Edgewater Handyman Pros", category: "Handyman", blurb: "Mounts, drywall, odd jobs — evenings OK.", phone: "(773) 555-0181", neighborhood: "Edgewater" },
     { name: "Garfield Park Landscaping", category: "Landscaper", blurb: "Mow, mulch, seasonal cleanups, small yards.", phone: "(773) 555-0125", neighborhood: "Garfield Park" },
     { name: "Halsted House Cleaners", category: "House cleaner", blurb: "Weekly/biweekly deep cleans, eco supplies.", phone: "(312) 555-0190", neighborhood: "Lincoln Square" },
-    { name: "Hyde Park Family Medicine — Dr. Maya Chen", category: "Doctor", blurb: "WELL demo PCP · primary care, annual wellness, same-week sick slots.", phone: "(773) 555-0155", neighborhood: "Hyde Park", towerHandle: "maya-chen", towerClaimed: true },
+    { name: "Hyde Park Family Medicine — Dr. Maya Chen", category: "Doctor", blurb: "WELL company · primary care, annual wellness, same-week sick slots.", phone: "(773) 555-0155", neighborhood: "Hyde Park", companyId: "hyde-park-family-medicine" },
     { name: "Hyde Park Pediatric Care", category: "Doctor", blurb: "Well-child visits and same-week sick slots.", phone: "(773) 555-0156", neighborhood: "Hyde Park" },
     { name: "Irving Park Auto Works", category: "Auto repair", blurb: "Brakes, oil, diagnostics — honest estimates.", phone: "(773) 555-0108", neighborhood: "Irving Park" },
     { name: "Jefferson Park Plumbing", category: "Plumber", blurb: "Clogs, water heaters, emergency call-outs.", phone: "(773) 555-0149", neighborhood: "Jefferson Park" },
     { name: "Kedzie Kids Daycare", category: "Daycare", blurb: "Ages 2–5, outdoor yard, CPR-certified staff.", phone: "(773) 555-0172", neighborhood: "Logan Square" },
     { name: "Lakeview Legal Group", category: "Lawyer", blurb: "Wills, landlord-tenant, small claims help.", phone: "(312) 555-0119", neighborhood: "Lakeview" },
-    { name: "Milwaukee Ave Grill", category: "Restaurant", blurb: "Burgers, shakes, late kitchen on weekends.", phone: "(773) 555-0166", neighborhood: "Wicker Park" },
+    { name: "Milwaukee Ave Grill", category: "Restaurant", blurb: "Burgers, shakes, late kitchen on weekends.", phone: "(773) 555-0166", neighborhood: "Wicker Park", companyId: "milwaukee-ave-grill" },
     { name: "Northside Nail & Paw Groomer", category: "Groomer", blurb: "Dogs & cats, gentle baths, nail trims.", phone: "(773) 555-0138", neighborhood: "Ravenswood" },
     { name: "Oak Street Orthodontics", category: "Dentist", blurb: "Braces and clear aligners for teens & adults.", phone: "(312) 555-0184", neighborhood: "Near North" },
     { name: "Pilsen Pasta House", category: "Restaurant", blurb: "Handmade pasta, red-sauce classics, patio.", phone: "(312) 555-0121", neighborhood: "Pilsen" },
@@ -74,7 +73,7 @@
     { name: "Elsie's Evergreen Landscaping", category: "Landscaper", blurb: "Native plantings and patio beds.", phone: "(773) 555-0136", neighborhood: "Evergreen Park" },
     { name: "Foster Pet Supply", category: "Pet store", blurb: "Bulk food, aquariums, local rescue board.", phone: "(773) 555-0106", neighborhood: "North Center" },
     { name: "Grand Crossing Handyman", category: "Handyman", blurb: "Fences, painting, appliance hookups.", phone: "(773) 555-0179", neighborhood: "Greater Grand Crossing" },
-    { name: "Heartland Internal Medicine", category: "Doctor", blurb: "Primary care, labs on-site, telehealth.", phone: "(312) 555-0147", neighborhood: "Streeterville", towerHandle: "heartland-md", towerClaimed: true },
+    { name: "Heartland Internal Medicine", category: "Doctor", blurb: "WELL company · primary care, labs on-site, telehealth.", phone: "(312) 555-0147", neighborhood: "Streeterville", companyId: "heartland-internal-medicine" },
     { name: "Montrose Electric & Lighting", category: "Electrician", blurb: "Track lighting and kitchen remodels.", phone: "(773) 555-0123", neighborhood: "Ravenswood" },
     { name: "Norridge Neighborhood Cleaners", category: "House cleaner", blurb: "Housekeeping for busy families.", phone: "(708) 555-0182", neighborhood: "Norridge" },
     { name: "Old Town Italian Kitchen", category: "Restaurant", blurb: "Thin crust, family tables, cash welcome.", phone: "(312) 555-0150", neighborhood: "Old Town" },
@@ -115,7 +114,7 @@
         " " +
         (item.phone || "") +
         " " +
-        (item.towerHandle || "")
+        (item.companyId || "")
       ).toLowerCase();
       return hay.indexOf(q) !== -1;
     }).slice().sort(function (a, b) {
@@ -183,22 +182,13 @@
   }
 
 
-  /**
-   * Claimed = explicit Cognation handle on the listing (provider claimed it).
-   * Do not invent handles from category or business name.
-   */
-  function listingTowerHandle(item) {
+  function listingCompanyId(item) {
     if (!item) return "";
-    var h = (item.towerHandle || "").trim().toLowerCase();
-    return h;
+    return String(item.companyId || "").trim();
   }
 
-  function isClaimedListing(item) {
-    if (!item) return false;
-    var handle = listingTowerHandle(item);
-    if (!handle) return false;
-    if (item.towerClaimed === false) return false;
-    return true;
+  function hasJobsLink(item) {
+    return !!listingCompanyId(item);
   }
 
   function switchMainTab(tabId) {
@@ -206,91 +196,37 @@
     if (tab) tab.click();
   }
 
-  function goToTowerProfile(handle) {
-    if (!handle) return;
-    var hash = "tower-profile-" + handle;
-    switchMainTab("tab-tower");
-    if (typeof window.CognationTowerApplySide === "function") {
-      window.CognationTowerApplySide("public");
-    }
-    if (location.hash === "#" + hash) {
-      window.setTimeout(function () {
-        var el = document.getElementById(hash);
-        if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 50);
-    } else {
-      location.hash = hash;
-    }
-  }
-
-  function showPagesCallHint(message) {
-    var existing = document.querySelector("[data-pages-call-hint]");
-    if (existing) existing.remove();
-    var hint = document.createElement("p");
-    hint.className = "pages-call-hint";
-    hint.setAttribute("data-pages-call-hint", "");
-    hint.setAttribute("role", "status");
-    hint.textContent = message;
-    var shell = document.querySelector("[data-pages-shell]");
-    if (shell) {
-      var intro = shell.querySelector(".pages-intro") || shell;
-      intro.appendChild(hint);
-    } else {
-      document.body.appendChild(hint);
-    }
-    window.setTimeout(function () {
-      if (hint.parentNode) hint.parentNode.removeChild(hint);
-    }, 4500);
-  }
-
-  function startProviderIpCall(item) {
-    switchMainTab("tab-well");
-    if (typeof window.CognationWellApplySide === "function") {
-      window.CognationWellApplySide("patient");
-    }
-    var WC = window.CognationWellCall;
-    if (WC && typeof WC.setActiveRole === "function" && typeof WC.startCall === "function") {
-      WC.setActiveRole("patient");
-      if (item && item.name) {
-        try {
-          WC.peerLabel = item.name;
-        } catch (e) {}
-      }
-      WC.startCall();
+  function goToCompanyJobs(companyId) {
+    if (!companyId) return;
+    if (window.WaymakersJobs && typeof window.WaymakersJobs.filterByCompany === "function") {
+      window.WaymakersJobs.filterByCompany(companyId);
       return;
     }
-    showPagesCallHint("Open the WELL tab (Patient side) to place an IP call — WebRTC stack still loading.");
+    location.hash = "jobs/" + encodeURIComponent(companyId);
+    switchMainTab("tab-jobs");
   }
 
   function appendListingActions(li, item) {
-    /* Tower + Call only when the listing was claimed with a Cognation handle */
-    if (!isClaimedListing(item)) return;
-    var handle = listingTowerHandle(item);
+    var companyId = listingCompanyId(item);
+    if (!companyId) return;
 
     var actions = document.createElement("div");
     actions.className = "pages-listing-actions";
 
-    var towerLink = document.createElement("a");
-    towerLink.className = "pages-tower-link";
-    towerLink.href = "#tower-profile-" + handle;
-    towerLink.textContent = "Tower · @" + handle;
-    towerLink.setAttribute("data-pages-tower", handle);
-    towerLink.addEventListener("click", function (e) {
+    var jobsLink = document.createElement("a");
+    jobsLink.className = "pages-jobs-link";
+    jobsLink.href = "#jobs/" + encodeURIComponent(companyId);
+    jobsLink.textContent = "View jobs";
+    jobsLink.setAttribute("data-pages-jobs", companyId);
+    jobsLink.setAttribute(
+      "aria-label",
+      "View jobs for " + (item.name || "this company")
+    );
+    jobsLink.addEventListener("click", function (e) {
       e.preventDefault();
-      goToTowerProfile(handle);
+      goToCompanyJobs(companyId);
     });
-    actions.appendChild(towerLink);
-
-    var callBtn = document.createElement("button");
-    callBtn.type = "button";
-    callBtn.className = "pages-call-btn";
-    callBtn.textContent = "Call via IP";
-    callBtn.setAttribute("data-pages-call-ip", handle);
-    callBtn.setAttribute("aria-label", "Call " + (item.name || "provider") + " via IP");
-    callBtn.addEventListener("click", function () {
-      startProviderIpCall(item);
-    });
-    actions.appendChild(callBtn);
+    actions.appendChild(jobsLink);
 
     li.appendChild(actions);
   }
@@ -343,7 +279,7 @@
       items.forEach(function (item) {
         var li = document.createElement("li");
         li.className = "pages-listing";
-        if (isClaimedListing(item)) li.classList.add("pages-listing--claimed");
+        if (hasJobsLink(item)) li.classList.add("pages-listing--has-jobs");
         li.innerHTML =
           '<div class="pages-listing-row">' +
           '<span class="pages-chip">' +

@@ -1,9 +1,13 @@
 /**
- * WELL — Cognation demo patient chart / EHR-style shell.
+ * WELL — WAYMAKERS demo patient chart / EHR-style shell.
  *
- * Two sides (like Tower): Patient (fillable documentation) | Provider (chart view only).
+ * Two portals: Patient (fillable documentation + portal inbox/notes)
+ *            | Provider (chart view; compose doctor messages + append-only notes)
  * sessionStorage: cognation.well.side = patient|provider
  * localStorage:   cognation.well.portal.v1  (demo chart + prefs — stays in this browser)
+ *
+ * Doctor messages: provider → patient (compose on Provider portal).
+ * Doctor notes: stored in the patient portal data; append-only / audit log — never deleted.
  *
  * Demo only — not a real EHR. Do not claim HIPAA compliance.
  */
@@ -25,7 +29,7 @@
   ];
 
   var DEMO_SEED = {
-    version: 3,
+    version: 4,
     patient: {
       name: "Alexa J. Thomas",
       dob: "1990-04-12",
@@ -41,6 +45,8 @@
       specialty: "Family Medicine",
       npi: "1890123456",
       clinic: "Hyde Park Family Medicine",
+      /* Shared with JOBS posts + PAGES listing (company/provider identity) */
+      companyId: "hyde-park-family-medicine",
     },
     appointments: [
       { id: "a1", when: "2026-09-18 09:30", patientId: "p1", patientName: "Alexa J. Thomas", where: "Hyde Park Family Medicine", reason: "Annual wellness" },
@@ -130,9 +136,48 @@
       },
     },
     messages: [
-      { from: "Care team", at: "2026-09-10 11:22", body: "Your annual wellness visit is confirmed for Sep 18 at 9:30 AM." },
-      { from: "You", at: "2026-09-10 12:05", body: "Thanks — I’ll arrive 10 minutes early for vitals." },
-      { from: "Care team", at: "2026-09-12 09:14", body: "Lab slip for Oct 2 is in your chart. Fasting 8–12 hours." },
+      {
+        id: "m1",
+        fromRole: "provider",
+        from: "Dr. Maya Chen, MD",
+        at: "2026-09-10 11:22",
+        body: "Your annual wellness visit is confirmed for Sep 18 at 9:30 AM.",
+      },
+      {
+        id: "m2",
+        fromRole: "patient",
+        from: "You",
+        at: "2026-09-10 12:05",
+        body: "Thanks — I'll arrive 10 minutes early for vitals.",
+      },
+      {
+        id: "m3",
+        fromRole: "provider",
+        from: "Dr. Maya Chen, MD",
+        at: "2026-09-12 09:14",
+        body: "Lab slip for Oct 2 is in your chart. Fasting 8–12 hours.",
+      },
+    ],
+    /* Provider-authored notes visible in the patient portal.
+       Audit-only: patients cannot edit or delete; append-only from provider. */
+    doctorNotes: [
+      {
+        id: "dn1",
+        at: "2026-09-15 10:40",
+        author: "Dr. Maya Chen, MD",
+        body: "Discussed BP trend and lifestyle. Continue current regimen. Labs ordered for Oct 2.",
+        immutable: true,
+      },
+    ],
+    doctorNotesAudit: [
+      {
+        id: "aud1",
+        at: "2026-09-15 10:40",
+        action: "append",
+        noteId: "dn1",
+        by: "Dr. Maya Chen, MD",
+        detail: "Doctor note created (append-only)",
+      },
     ],
     prefs: {
       lastSection: "intake",
@@ -444,7 +489,68 @@
       }
     }
     if (Array.isArray(raw.roster)) base.roster = raw.roster;
-    if (Array.isArray(raw.messages)) base.messages = raw.messages;
+    if (Array.isArray(raw.messages)) {
+      base.messages = raw.messages.map(function (m) {
+        return normalizeMessage(m);
+      });
+    } else if (Array.isArray(base.messages)) {
+      base.messages = base.messages.map(function (m) {
+        return normalizeMessage(m);
+      });
+    }
+    /* Doctor notes: union by id (append-only). Never drop seed or previously saved notes. */
+    (function mergeNotes() {
+      var byId = {};
+      function take(list) {
+        (list || []).forEach(function (n) {
+          if (!n || !n.id) return;
+          if (!byId[n.id]) {
+            var note = Object.assign({}, n);
+            note.immutable = true;
+            byId[n.id] = note;
+          }
+        });
+      }
+      take(DEMO_SEED.doctorNotes);
+      take(raw.doctorNotes);
+      take(base.doctorNotes);
+      base.doctorNotes = Object.keys(byId)
+        .map(function (k) {
+          return byId[k];
+        })
+        .sort(function (a, b) {
+          return String(a.at || "").localeCompare(String(b.at || ""));
+        });
+    })();
+    (function mergeAudit() {
+      var byId = {};
+      var out = [];
+      function take(list) {
+        (list || []).forEach(function (a) {
+          if (!a) return;
+          var id =
+            a.id ||
+            String(a.at || "") +
+              "|" +
+              String(a.action || "") +
+              "|" +
+              String(a.noteId || "") +
+              "|" +
+              String(a.detail || "");
+          if (byId[id]) return;
+          var row = Object.assign({ id: id }, a);
+          byId[id] = row;
+          out.push(row);
+        });
+      }
+      take(DEMO_SEED.doctorNotesAudit);
+      take(raw.doctorNotesAudit);
+      take(base.doctorNotesAudit);
+      out.sort(function (a, b) {
+        return String(a.at || "").localeCompare(String(b.at || ""));
+      });
+      base.doctorNotesAudit = out;
+    })();
     if (raw.chart && typeof raw.chart === "object") {
       ["intake", "hpi", "vitals", "progress", "plan"].forEach(function (k) {
         if (raw.chart[k] && typeof raw.chart[k] === "object") {
@@ -461,7 +567,7 @@
         base.chart.diagnoses = deepClone(DEMO_SEED.chart.diagnoses);
       }
     }
-    base.version = Math.max(3, Number(raw.version) || 0, Number(base.version) || 0);
+    base.version = Math.max(4, Number(raw.version) || 0, Number(base.version) || 0);
     return ensureCalPrefs(base);
   }
 
@@ -475,8 +581,98 @@
         return deepClone(DEMO_SEED);
       }
     },
+    /** Persist portal. Doctor notes are append-only — deletes are blocked + audited. */
     save: function (data) {
       try {
+        var prev = null;
+        try {
+          var rawPrev = localStorage.getItem(PORTAL_KEY);
+          if (rawPrev) prev = mergeSeed(JSON.parse(rawPrev));
+        } catch (ePrev) {
+          prev = null;
+        }
+        if (!prev) prev = deepClone(DEMO_SEED);
+        data = data || {};
+        if (Array.isArray(data.messages)) {
+          data.messages = data.messages.map(function (m) {
+            return normalizeMessage(m);
+          });
+        }
+        var prevNotes = prev.doctorNotes || [];
+        var nextNotes = Array.isArray(data.doctorNotes) ? data.doctorNotes : [];
+        var prevById = {};
+        prevNotes.forEach(function (n) {
+          if (n && n.id) prevById[n.id] = n;
+        });
+        var nextById = {};
+        nextNotes.forEach(function (n) {
+          if (n && n.id) nextById[n.id] = n;
+        });
+        var missing = Object.keys(prevById).filter(function (id) {
+          return !nextById[id];
+        });
+        /* Union: keep all previous notes; accept new ids from next */
+        var union = {};
+        var order = [];
+        prevNotes.concat(nextNotes).forEach(function (n) {
+          if (!n || !n.id) return;
+          if (!union[n.id]) {
+            var copy = Object.assign({}, n);
+            copy.immutable = true;
+            /* Prefer the previously persisted body (immutable) */
+            if (prevById[n.id]) {
+              copy = Object.assign({}, prevById[n.id]);
+              copy.immutable = true;
+            }
+            union[n.id] = copy;
+            order.push(n.id);
+          }
+        });
+        data.doctorNotes = order.map(function (id) {
+          return union[id];
+        });
+        data.doctorNotesAudit = data.doctorNotesAudit || [];
+        /* Merge prior audit rows */
+        var auditById = {};
+        var auditOut = [];
+        function takeAudit(list) {
+          (list || []).forEach(function (a) {
+            if (!a) return;
+            var id =
+              a.id ||
+              String(a.at || "") +
+                "|" +
+                String(a.action || "") +
+                "|" +
+                String(a.noteId || "");
+            if (auditById[id]) return;
+            var row = Object.assign({ id: id }, a);
+            auditById[id] = row;
+            auditOut.push(row);
+          });
+        }
+        takeAudit(prev.doctorNotesAudit);
+        takeAudit(data.doctorNotesAudit);
+        if (missing.length) {
+          missing.forEach(function (id) {
+            var row = {
+              id: newId("aud"),
+              at: nowStamp(),
+              action: "attempted_delete",
+              noteId: id,
+              by: (data.provider && data.provider.name) || "system",
+              detail: "Blocked — doctor notes are append-only / audit-only",
+            };
+            if (!auditById[row.id]) {
+              auditById[row.id] = row;
+              auditOut.push(row);
+            }
+          });
+        }
+        auditOut.sort(function (a, b) {
+          return String(a.at || "").localeCompare(String(b.at || ""));
+        });
+        data.doctorNotesAudit = auditOut;
         localStorage.setItem(PORTAL_KEY, JSON.stringify(data));
         return true;
       } catch (e) {
@@ -1194,6 +1390,138 @@
     });
   }
 
+
+  function nowStamp() {
+    var d = new Date();
+    function pad(n) {
+      return n < 10 ? "0" + n : String(n);
+    }
+    return (
+      d.getFullYear() +
+      "-" +
+      pad(d.getMonth() + 1) +
+      "-" +
+      pad(d.getDate()) +
+      " " +
+      pad(d.getHours()) +
+      ":" +
+      pad(d.getMinutes())
+    );
+  }
+
+  function newId(prefix) {
+    return (
+      prefix +
+      Date.now().toString(36) +
+      Math.floor(Math.random() * 1e4).toString(36)
+    );
+  }
+
+  function normalizeMessage(m) {
+    m = m || {};
+    var role = m.fromRole;
+    if (role !== "provider" && role !== "patient") {
+      var f = String(m.from || "").toLowerCase();
+      role = f === "you" || f.indexOf("patient") !== -1 ? "patient" : "provider";
+    }
+    return {
+      id: m.id || newId("m"),
+      fromRole: role,
+      from: m.from || (role === "patient" ? "You" : "Care team"),
+      at: m.at || nowStamp(),
+      body: m.body || "",
+    };
+  }
+
+  function renderMessageThread(messages) {
+    return (messages || [])
+      .map(function (raw) {
+        var m = normalizeMessage(raw);
+        return (
+          '<div class="well-msg well-msg--' +
+          escapeHtml(m.fromRole) +
+          '"><div class="well-msg-meta">' +
+          escapeHtml(m.from) +
+          " · " +
+          escapeHtml(m.at) +
+          '</div><div class="well-msg-body">' +
+          escapeHtml(m.body) +
+          "</div></div>"
+        );
+      })
+      .join("");
+  }
+
+  function renderDoctorNotesHtml(notes, opts) {
+    opts = opts || {};
+    var list = notes || [];
+    if (!list.length) {
+      return '<p class="well-muted well-tiny">No doctor notes yet.</p>';
+    }
+    return list
+      .map(function (n) {
+        return (
+          '<article class="well-doctor-note" data-doctor-note-id="' +
+          escapeHtml(n.id || "") +
+          '">' +
+          '<div class="well-doctor-note-meta">' +
+          "<span>" +
+          escapeHtml(n.author || "Provider") +
+          " · " +
+          escapeHtml(n.at || "") +
+          "</span>" +
+          '<span class="well-audit-badge">Audit only</span>' +
+          "</div>" +
+          '<div class="well-doctor-note-body">' +
+          escapeHtml(n.body || "") +
+          "</div>" +
+          (opts.patientView
+            ? '<p class="well-doctor-note-foot">Visible in your portal · cannot be edited or deleted</p>'
+            : '<p class="well-doctor-note-foot">Append-only · not deletable from patient portal</p>') +
+          "</article>"
+        );
+      })
+      .join("");
+  }
+
+  function appendPortalMessage(fromRole, body) {
+    var cur = PortalStore.get();
+    var textBody = String(body || "").trim();
+    if (!textBody) return cur;
+    var label =
+      fromRole === "provider"
+        ? (cur.provider && cur.provider.name) || "Care team"
+        : "You";
+    if (!Array.isArray(cur.messages)) cur.messages = [];
+    cur.messages.push(
+      normalizeMessage({
+        id: newId("m"),
+        fromRole: fromRole,
+        from: label,
+        at: nowStamp(),
+        body: textBody,
+      })
+    );
+    PortalStore.save(cur);
+    return cur;
+  }
+
+  function appendDoctorNote(body) {
+    var cur = PortalStore.get();
+    var textBody = String(body || "").trim();
+    if (!textBody) return cur;
+    if (!Array.isArray(cur.doctorNotes)) cur.doctorNotes = [];
+    cur.doctorNotes.push({
+      id: newId("dn"),
+      at: nowStamp(),
+      author: (cur.provider && cur.provider.name) || "Provider",
+      body: textBody,
+      immutable: true,
+    });
+    PortalStore.save(cur);
+    return cur;
+  }
+
   function renderPatient(root, data, forceSection) {
     var host = root.querySelector("[data-well-patient-root]");
     if (!host) return;
@@ -1224,21 +1552,21 @@
         : '<li class="well-muted">No upcoming appointments.</li>') +
       "</ul></section>" +
       '<section class="well-rail-card">' +
-      "<h4>Messages to care team</h4><div class=\"well-thread\" role=\"log\" aria-label=\"Message thread\">" +
-      (data.messages || [])
-        .map(function (m) {
-          return (
-            '<div class="well-msg"><div class="well-msg-meta">' +
-            escapeHtml(m.from) +
-            " · " +
-            escapeHtml(m.at) +
-            "</div><div class=\"well-msg-body\">" +
-            escapeHtml(m.body) +
-            "</div></div>"
-          );
-        })
-        .join("") +
-      "</div><p class=\"well-muted well-tiny\">Stub thread · demo only</p></section>" +
+      "<h4>Messages with your doctor</h4>" +
+      '<div class="well-thread" role="log" aria-label="Doctor to patient messages">' +
+      renderMessageThread(data.messages) +
+      "</div>" +
+      '<form class="well-compose" data-well-patient-compose>' +
+      '<label class="well-sr-only" for="well-pt-msg">Message your care team</label>' +
+      '<textarea id="well-pt-msg" data-well-patient-msg placeholder="Write a message to your care team…" rows="3"></textarea>' +
+      '<div class="well-compose-actions">' +
+      '<button type="submit" class="btn btn-primary">Send to care team</button>' +
+      "</div></form>" +
+      '<p class="well-muted well-tiny">Doctor replies appear here · demo stays in this browser</p></section>' +
+      '<section class="well-rail-card">' +
+      "<h4>Notes from your doctor</h4>" +
+      renderDoctorNotesHtml(data.doctorNotes, { patientView: true }) +
+      '<p class="well-muted well-tiny">Audit-only · you can read these; they cannot be deleted</p></section>' +
       WellCall.renderPanelHtml("patient", data) +
       "</aside>";
 
@@ -1291,6 +1619,17 @@
     }
 
     WellCall.afterRender(root, "patient");
+
+    var ptForm = host.querySelector("[data-well-patient-compose]");
+    if (ptForm) {
+      ptForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var ta = host.querySelector("[data-well-patient-msg]");
+        var body = ta ? ta.value : "";
+        var cur = appendPortalMessage("patient", body);
+        renderPatient(root, cur);
+      });
+    }
   }
 
   function renderProvider(root, data) {
@@ -1333,6 +1672,16 @@
       escapeHtml(data.provider.npi) +
       "</span><br>" +
       escapeHtml(data.provider.clinic) +
+      (data.provider.companyId
+        ? '<br><span class="well-muted well-tiny">Company id · ' +
+          escapeHtml(data.provider.companyId) +
+          ' · openings live on JOBS</span>' +
+          '<br><a class="well-jobs-link" href="#jobs/' +
+          encodeURIComponent(data.provider.companyId) +
+          '" data-well-jobs-link="' +
+          escapeHtml(data.provider.companyId) +
+          '">View company jobs</a>'
+        : "") +
       "</p></section>" +
       WellCall.renderPanelHtml("provider", data) +
       '<section class="well-rail-card well-rail-card--calendar">' +
@@ -1355,11 +1704,27 @@
       "<li>Referral · Nutrition (demo) <span class=\"well-badge\">Draft</span></li>" +
       "</ul></section>" +
       '<section class="well-rail-card">' +
-      "<h4>Secure inbox stub</h4>" +
-      '<ul class="well-list well-list--compact">' +
-      "<li>Alexa J. Thomas · Lab questions</li>" +
-      "<li>Front desk · Refill request</li>" +
-      "</ul></section></aside>";
+      "<h4>Messages to patient</h4>" +
+      '<div class="well-thread" role="log" aria-label="Doctor to patient message thread">' +
+      renderMessageThread(data.messages) +
+      "</div>" +
+      '<form class="well-compose" data-well-provider-compose-msg>' +
+      '<label class="well-sr-only" for="well-pv-msg">Message the patient</label>' +
+      '<textarea id="well-pv-msg" data-well-provider-msg placeholder="Write a message to the patient…" rows="3"></textarea>' +
+      '<div class="well-compose-actions">' +
+      '<button type="submit" class="btn btn-primary">Send to patient</button>' +
+      "</div></form>" +
+      '<p class="well-muted well-tiny">Doctor → patient · visible in patient portal</p></section>' +
+      '<section class="well-rail-card">' +
+      "<h4>Doctor notes (patient portal)</h4>" +
+      renderDoctorNotesHtml(data.doctorNotes, { patientView: false }) +
+      '<form class="well-compose" data-well-provider-compose-note>' +
+      '<label class="well-sr-only" for="well-pv-note">Add doctor note</label>' +
+      '<textarea id="well-pv-note" data-well-provider-note placeholder="Add a clinical note the patient can read (audit-only)…" rows="3"></textarea>' +
+      '<div class="well-compose-actions">' +
+      '<button type="submit" class="btn btn-primary">Post note to patient portal</button>' +
+      "</div></form>" +
+      '<p class="well-muted well-tiny">Append-only · patients cannot delete</p></section></aside>';
 
     var chartBody;
     if (isPrimary) {
@@ -1540,6 +1905,40 @@
     }
 
     WellCall.afterRender(root, "provider");
+    root.querySelectorAll("[data-well-jobs-link]").forEach(function (a) {
+      a.addEventListener("click", function (e) {
+        e.preventDefault();
+        var id = a.getAttribute("data-well-jobs-link");
+        if (window.WaymakersJobs && typeof window.WaymakersJobs.filterByCompany === "function") {
+          window.WaymakersJobs.filterByCompany(id);
+        } else {
+          location.hash = "jobs/" + encodeURIComponent(id || "");
+          var tab = document.getElementById("tab-jobs");
+          if (tab) tab.click();
+        }
+      });
+    });
+
+    var pvMsgForm = host.querySelector("[data-well-provider-compose-msg]");
+    if (pvMsgForm) {
+      pvMsgForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var ta = host.querySelector("[data-well-provider-msg]");
+        var body = ta ? ta.value : "";
+        var cur = appendPortalMessage("provider", body);
+        renderProvider(root, cur);
+      });
+    }
+    var pvNoteForm = host.querySelector("[data-well-provider-compose-note]");
+    if (pvNoteForm) {
+      pvNoteForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var ta = host.querySelector("[data-well-provider-note]");
+        var body = ta ? ta.value : "";
+        var cur = appendDoctorNote(body);
+        renderProvider(root, cur);
+      });
+    }
   }
 
 
