@@ -1511,15 +1511,57 @@
     var textBody = String(body || "").trim();
     if (!textBody) return cur;
     if (!Array.isArray(cur.doctorNotes)) cur.doctorNotes = [];
-    cur.doctorNotes.push({
+    if (!Array.isArray(cur.doctorNotesAudit)) cur.doctorNotesAudit = [];
+    var note = {
       id: newId("dn"),
       at: nowStamp(),
       author: (cur.provider && cur.provider.name) || "Provider",
       body: textBody,
       immutable: true,
+    };
+    cur.doctorNotes.push(note);
+    cur.doctorNotesAudit.push({
+      id: newId("aud"),
+      at: note.at,
+      action: "append",
+      noteId: note.id,
+      by: note.author,
+      detail: "Doctor note created (append-only)",
     });
     PortalStore.save(cur);
     return cur;
+  }
+
+  function renderAuditLogHtml(audit) {
+    var list = (audit || []).slice().sort(function (a, b) {
+      return String(b.at || "").localeCompare(String(a.at || ""));
+    });
+    if (!list.length) {
+      return '<p class="well-muted well-tiny">No audit events yet.</p>';
+    }
+    return (
+      '<details class="well-audit-log">' +
+      "<summary>Audit log (" +
+      list.length +
+      ")</summary>" +
+      '<ul class="well-list well-list--compact well-audit-list">' +
+      list
+        .map(function (a) {
+          return (
+            "<li><strong>" +
+            escapeHtml(a.action || "") +
+            "</strong> · " +
+            escapeHtml(a.at || "") +
+            '<br><span class="well-muted">' +
+            escapeHtml(a.by || "") +
+            (a.noteId ? " · note " + escapeHtml(a.noteId) : "") +
+            (a.detail ? " — " + escapeHtml(a.detail) : "") +
+            "</span></li>"
+          );
+        })
+        .join("") +
+      "</ul></details>"
+    );
   }
 
   function renderPatient(root, data, forceSection) {
@@ -1566,6 +1608,7 @@
       '<section class="well-rail-card">' +
       "<h4>Notes from your doctor</h4>" +
       renderDoctorNotesHtml(data.doctorNotes, { patientView: true }) +
+      renderAuditLogHtml(data.doctorNotesAudit) +
       '<p class="well-muted well-tiny">Audit-only · you can read these; they cannot be deleted</p></section>' +
       WellCall.renderPanelHtml("patient", data) +
       "</aside>";
@@ -1610,11 +1653,25 @@
     var resetAll = host.querySelector("[data-well-reset-all]");
     if (resetAll) {
       resetAll.addEventListener("click", function () {
+        var prev = PortalStore.get();
         var fresh = deepClone(DEMO_SEED);
         fresh.prefs.lastSection = sectionId;
+        /* Doctor notes + audit are append-only — never wiped by chart reset */
+        fresh.doctorNotes = deepClone(prev.doctorNotes || DEMO_SEED.doctorNotes);
+        fresh.doctorNotesAudit = deepClone(
+          prev.doctorNotesAudit || DEMO_SEED.doctorNotesAudit || []
+        );
+        fresh.doctorNotesAudit.push({
+          id: newId("aud"),
+          at: nowStamp(),
+          action: "chart_reset",
+          noteId: "",
+          by: "patient",
+          detail: "Chart fields reset; doctor notes preserved (append-only)",
+        });
         PortalStore.save(fresh);
-        renderPatient(root, fresh, sectionId);
-        setStatus(root, "Entire demo chart reset.", false);
+        renderPatient(root, PortalStore.get(), sectionId);
+        setStatus(root, "Chart reset · doctor notes preserved (audit-only).", false);
       });
     }
 
@@ -1718,6 +1775,7 @@
       '<section class="well-rail-card">' +
       "<h4>Doctor notes (patient portal)</h4>" +
       renderDoctorNotesHtml(data.doctorNotes, { patientView: false }) +
+      renderAuditLogHtml(data.doctorNotesAudit) +
       '<form class="well-compose" data-well-provider-compose-note>' +
       '<label class="well-sr-only" for="well-pv-note">Add doctor note</label>' +
       '<textarea id="well-pv-note" data-well-provider-note placeholder="Add a clinical note the patient can read (audit-only)…" rows="3"></textarea>' +
