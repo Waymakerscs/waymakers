@@ -82,6 +82,7 @@
       }),
     }).then(function (result) {
       if (result && result.session) writeSession(result.session);
+      else if (result && result.access_token) writeSession(result);
       return result;
     });
   }
