@@ -191,19 +191,21 @@
             <span class="form-hint" id="phone-hint">Include country code when possible.</span>
           </div>
           <div class="form-group">
-            <label for="email">Email</label>
+            <label for="signup-username">Username</label>
             <input
-              type="email"
-              id="email"
-              name="email"
-              autocomplete="email"
-              inputmode="email"
-              required
-              placeholder="you@example.com"
-              aria-describedby="email-hint"
+              type="text"
+              id="signup-username"
+              name="signup-username"
+              autocomplete="nickname"
+              autocapitalize="none"
+              spellcheck="false"
+              maxlength="40"
+              placeholder="optional"
+              aria-describedby="signup-username-hint"
               aria-invalid="false"
+              data-login-signup-username
             >
-            <span class="form-hint" id="email-hint">We will never share your email in this demo.</span>
+            <span class="form-hint" id="signup-username-hint">3–40 letters, numbers, _ or -. Leave blank to use your email name.</span>
           </div>
         </div>
 
