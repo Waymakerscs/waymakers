@@ -20,8 +20,9 @@
  *
  *   Privacy boundary: shared calendar overlays on both portals are built only
  *   from WellCalendarConnect.presentForRole. That view is Busy/Free unless the
- *   signed-in person owns the event. Clinic patient names stay in a separate
- *   provider-only schedule list, never on the shared overlay.
+ *   signed-in person owns the event. Opaque pills do not print staff short
+ *   names. Clinic patient names stay in a separate provider-only schedule
+ *   list, never on the shared overlay.
  *
  * Demo only — not a real EHR. Do not claim HIPAA compliance.
  */
@@ -2461,19 +2462,22 @@
   /**
    * Privacy boundary for shared-calendar chrome.
    * Pills and held rows print only presentForRole() fields. Owned events keep
-   * their title. Every other calendar is Busy / Unavailable.
+   * their title. Every other calendar is a generic Busy / Unavailable
+   * placeholder: no staff short name, title, or someone else's reason.
    */
   function renderBusyPill(view, color) {
     var shown = view.owned ? view.title || view.label : view.label;
-    var who = view.who
-      ? '<span class="well-busy-who">' + escapeHtml(view.who) + "</span>"
-      : "";
+    var who =
+      view.owned && view.who
+        ? '<span class="well-busy-who">' + escapeHtml(view.who) + "</span>"
+        : "";
     var src =
       view.owned && view.sourceLabel
         ? '<span class="well-src-tag">' + escapeHtml(view.sourceLabel) + "</span>"
         : "";
     var privateCls = view.owned ? "" : " well-busy-pill--private";
     var selfCls = view.owned ? " well-busy-pill--self" : "";
+    var aria = view.owned && view.who ? view.who + ", " + shown : shown;
     return (
       '<span class="well-busy-pill' +
       privateCls +
@@ -2481,7 +2485,7 @@
       '" style="--emp:' +
       escapeHtml(color || "#8a96a3") +
       '" aria-label="' +
-      escapeHtml((view.who ? view.who + ", " : "") + shown) +
+      escapeHtml(aria) +
       '">' +
       who +
       '<span class="well-busy-title">' +
@@ -2504,7 +2508,7 @@
       side === "provider" ? "provider" : "patient",
       "held"
     );
-    var who = view.who ? escapeHtml(view.who) + " · " : "";
+    var who = view.owned && view.who ? escapeHtml(view.who) + " · " : "";
     var text = view.owned ? view.title || view.label : view.label;
     var src =
       view.owned && view.sourceLabel
@@ -3228,7 +3232,7 @@
       '<section class="well-rail-card well-rail-card--calendar well-rail-card--schedule" data-well-schedule-card>' +
       "<h4>Team schedule</h4>" +
       '<p class="well-muted well-tiny">Shared employee calendars · suggest the next open visit, or add one yourself.</p>' +
-      '<p class="well-privacy-note">Shared overlay is Busy / Free except your own calendar. Other employees\u2019 subjects stay hidden. Patient names are only in the clinic schedule under the board.</p>' +
+      '<p class="well-privacy-note">Shared overlay is Busy / Free except your own calendar. Other employees\u2019 names and subjects stay hidden. Patient names are only in the clinic schedule under the board.</p>' +
       renderTeamsConnect(data, "provider") +
       renderMonthCalendar(data, { side: "provider" }) +
       '<div class="well-cal-daypanel">' +

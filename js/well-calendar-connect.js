@@ -21,7 +21,7 @@
  * Privacy boundary: presentForRole(block, role, surface).
  *   Shared overlays are opaque Busy / Free for every calendar the viewer does
  *   not own — patients and employees alike. No subjects, attendees, notes,
- *   other patients' names, reasons, or MRNs.
+ *   staff short names, other patients' names, reasons, or MRNs.
  *   Full detail is owner-only. The patient owns their WELL visits and their
  *   own Outlook calendar. The signed-in provider (demo: Dr. Maya Chen) owns
  *   only that employee's Outlook/Teams events. Clinic names for workflow live
@@ -529,9 +529,9 @@
    * Single display gate for shared-calendar UI.
    * Results are a whitelist: label, title, who, source. Notes, attendees, and
    * patient fields on the input block are never copied.
-   * Owned blocks keep their own title. Every other block is Busy (day board)
-   * or Unavailable (held slot), with a staff short name only when the block
-   * is someone else's employee calendar.
+   * Owned blocks keep their own title. Every other block is a generic
+   * Busy (day board) or Unavailable (held slot) placeholder — no staff
+   * short name, subject, or other person's reason.
    */
   function presentForRole(block, role, surface) {
     block = block || {};
@@ -551,18 +551,13 @@
         sourceLabel: sourceLabel(showSource),
       };
     }
-    var who = "";
-    if (block.kind === "employee" && block.employeeId) {
-      var emp = staffById(block.employeeId);
-      if (emp) who = emp.short;
-    }
     return {
       role: roleName,
       owned: false,
       state: "busy",
       label: opaque,
       title: "",
-      who: who,
+      who: "",
       source: "",
       sourceLabel: "",
     };
