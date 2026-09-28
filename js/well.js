@@ -13,6 +13,16 @@
  *   consent + upload events are append-only in appleHealth.audit. Live HealthKit sync
  *   needs a native iOS app later — web UI stays honest about that.
  *
+ * Shared schedule (v6): Teams-style clinic calendar on Patient and Provider.
+ *   js/well-calendar-connect.js is the demo Microsoft 365 adapter (mock employee
+ *   Outlook/Teams busy + first-available slots). Connection and visible-employee
+ *   picks live in this same portal store. No live Graph OAuth.
+ *
+ *   Privacy boundary: shared calendar overlays on both portals are built only
+ *   from WellCalendarConnect.presentForRole. That view is Busy/Free unless the
+ *   signed-in person owns the event. Clinic patient names stay in a separate
+ *   provider-only schedule list, never on the shared overlay.
+ *
  * Demo only — not a real EHR. Do not claim HIPAA compliance.
  */
 (function () {
@@ -47,7 +57,7 @@
   var APPLE_HEALTH_MAX_BYTES = 25 * 1024 * 1024; /* 25 MB demo cap */
 
   var DEMO_SEED = {
-    version: 5,
+    version: 6,
     patient: {
       name: "Alexa J. Thomas",
       dob: "1990-04-12",
@@ -67,11 +77,11 @@
       companyId: "hyde-park-family-medicine",
     },
     appointments: [
-      { id: "a1", when: "2026-09-18 09:30", patientId: "p1", patientName: "Alexa J. Thomas", where: "Hyde Park Family Medicine", reason: "Annual wellness" },
-      { id: "a2", when: "2026-09-18 10:15", patientId: "p2", patientName: "Jordan Rivera", where: "Hyde Park Family Medicine", reason: "HTN follow-up" },
-      { id: "a3", when: "2026-09-18 11:00", patientId: "p3", patientName: "Sam Okonkwo", where: "Hyde Park Family Medicine", reason: "URI / sick visit" },
-      { id: "a4", when: "2026-09-18 13:30", patientId: "p4", patientName: "Priya Nair", where: "Hyde Park Family Medicine", reason: "Diabetes check" },
-      { id: "a5", when: "2026-10-02 14:00", patientId: "p1", patientName: "Alexa J. Thomas", where: "Lab · Streeterville", reason: "Fasting labs" },
+      { id: "a1", when: "2026-09-18 09:30", patientId: "p1", patientName: "Alexa J. Thomas", where: "Hyde Park Family Medicine", reason: "Annual wellness", clinicianId: "emp-maya", clinicianName: "Dr. Maya Chen, MD" },
+      { id: "a2", when: "2026-09-18 10:15", patientId: "p2", patientName: "Jordan Rivera", where: "Hyde Park Family Medicine", reason: "HTN follow-up", clinicianId: "emp-maya", clinicianName: "Dr. Maya Chen, MD" },
+      { id: "a3", when: "2026-09-18 11:00", patientId: "p3", patientName: "Sam Okonkwo", where: "Hyde Park Family Medicine", reason: "URI / sick visit", clinicianId: "emp-maya", clinicianName: "Dr. Maya Chen, MD" },
+      { id: "a4", when: "2026-09-18 13:30", patientId: "p4", patientName: "Priya Nair", where: "Hyde Park Family Medicine", reason: "Diabetes check", clinicianId: "emp-maya", clinicianName: "Dr. Maya Chen, MD" },
+      { id: "a5", when: "2026-10-02 14:00", patientId: "p1", patientName: "Alexa J. Thomas", where: "Lab · Streeterville", reason: "Fasting labs", clinicianId: "emp-maya", clinicianName: "Dr. Maya Chen, MD" },
     ],
     roster: [
       { id: "p1", name: "Alexa J. Thomas", mrn: "CGN-DEMO-10482", dob: "1990-04-12", reason: "Annual wellness", time: "09:30" },
@@ -210,6 +220,18 @@
       uploads: [],
       audit: [],
     },
+    /* Shared Microsoft 365 / Teams demo connection. See well-calendar-connect.js. */
+    calendarConnect: {
+      connected: false,
+      provider: "",
+      connectedAt: "",
+      tenant: "Hyde Park Family Medicine",
+      accountLabel: "",
+      visibleEmployeeIds: ["emp-maya", "emp-james", "emp-nina", "emp-leo", "emp-priya"],
+      includePatientCalendar: true,
+      bookVisitType: "wellness",
+      bookClinicianId: "emp-maya",
+    },
     prefs: {
       lastSection: "intake",
       selectedRosterId: "p1",
@@ -309,30 +331,66 @@
     });
   }
 
-  function datesWithAppointments(data, year, month0) {
-    var set = {};
-    (data.appointments || []).forEach(function (a) {
+  function buildMonthMarks(data, year, month0, side) {
+    var CC = window.WellCalendarConnect;
+    var marks = {};
+    function slot(iso) {
+      if (!marks[iso]) marks[iso] = { appt: false, colors: [] };
+      return marks[iso];
+    }
+    var appts = side === "patient" ? patientFacingAppointments(data) : data.appointments || [];
+    appts.forEach(function (a) {
       var p = parseWhen(a.when);
       if (!p.date) return;
       var parts = p.date.split("-");
       if (parts.length !== 3) return;
       var y = parseInt(parts[0], 10);
       var m = parseInt(parts[1], 10) - 1;
-      if (y === year && m === month0) set[p.date] = true;
+      if (y === year && m === month0) slot(p.date).appt = true;
     });
-    return set;
+    if (!CC) return marks;
+    var cc = CC.normalize(data.calendarConnect);
+    if (!cc.connected) return marks;
+    var dim = new Date(year, month0 + 1, 0).getDate();
+    var d;
+    for (d = 1; d <= dim; d++) {
+      var iso = isoDate(year, month0, d);
+      cc.visibleEmployeeIds.forEach(function (id) {
+        var emp = CC.staffById(id);
+        if (!emp) return;
+        if (!CC.eventsOn(id, iso).length) return;
+        var mark = slot(iso);
+        if (mark.colors.indexOf(emp.color) < 0 && mark.colors.length < 4) mark.colors.push(emp.color);
+      });
+    }
+    return marks;
+  }
+
+  function renderCalDots(mark) {
+    if (!mark) return "";
+    var bits = [];
+    (mark.colors || []).forEach(function (c) {
+      bits.push(
+        '<span class="well-cal-dot well-cal-dot--emp" style="background:' + escapeHtml(c) + '"></span>'
+      );
+    });
+    if (mark.appt) bits.push('<span class="well-cal-dot well-cal-dot--appt"></span>');
+    if (!bits.length) return "";
+    return '<span class="well-cal-dots">' + bits.join("") + "</span>";
   }
 
   function newAppointmentId() {
     return "a" + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
   }
 
-  function renderMonthCalendar(data) {
+  function renderMonthCalendar(data, opts) {
+    opts = opts || {};
     ensureCalPrefs(data);
     var year = data.prefs.calYear;
     var month0 = data.prefs.calMonth;
     var selected = data.prefs.selectedCalDate;
-    var marked = datesWithAppointments(data, year, month0);
+    var side = opts.side || "provider";
+    var marks = opts.marks || buildMonthMarks(data, year, month0, side);
     var first = new Date(year, month0, 1);
     var startDow = first.getDay(); /* 0=Sun */
     var daysInMonth = new Date(year, month0 + 1, 0).getDate();
@@ -346,10 +404,12 @@
     }
     for (i = 1; i <= daysInMonth; i++) {
       var iso = isoDate(year, month0, i);
+      var mark = marks[iso] || { appt: false, colors: [] };
       var cls = "well-cal-cell";
       if (iso === selected) cls += " is-selected";
       if (iso === todayIso) cls += " is-today";
-      if (marked[iso]) cls += " has-appts";
+      if (mark.appt) cls += " has-appts";
+      if (mark.colors && mark.colors.length) cls += " has-busy";
       cells.push(
         '<button type="button" class="' +
           cls +
@@ -357,14 +417,15 @@
           escapeHtml(iso) +
           '" aria-label="' +
           escapeHtml(iso) +
-          (marked[iso] ? ", has appointments" : "") +
+          (mark.appt ? ", has appointments" : "") +
+          (mark.colors && mark.colors.length ? ", staff busy" : "") +
           (iso === selected ? ", selected" : "") +
           '" aria-pressed="' +
           (iso === selected ? "true" : "false") +
           '"><span class="well-cal-daynum">' +
           i +
           "</span>" +
-          (marked[iso] ? '<span class="well-cal-dot" aria-hidden="true"></span>' : "") +
+          renderCalDots(mark) +
           "</button>"
       );
     }
@@ -393,69 +454,57 @@
     );
   }
 
-  function renderDayAppointmentsList(data, dateIso) {
-    var list = appointmentsForDate(data, dateIso);
-    if (!list.length) {
-      return '<p class="well-muted well-tiny">No appointments on this day.</p>';
-    }
-    return (
-      '<ul class="well-roster" role="list">' +
-      list
-        .map(function (a) {
-          var p = parseWhen(a.when);
-          var on = a.patientId && a.patientId === data.prefs.selectedRosterId;
-          return (
-            "<li>" +
-            '<div class="well-appt-row' +
-            (on ? " is-selected" : "") +
-            '">' +
-            (a.patientId
-              ? '<button type="button" class="well-roster-btn well-appt-open" data-well-roster="' +
-                escapeHtml(a.patientId) +
-                '" aria-pressed="' +
-                (on ? "true" : "false") +
-                '"><span class="well-roster-time">' +
-                escapeHtml(p.time || "—") +
-                '</span><span class="well-roster-name">' +
-                escapeHtml(a.patientName || "Patient") +
-                '</span><span class="well-muted">' +
-                escapeHtml(a.reason || "") +
-                "</span></button>"
-              : '<div class="well-roster-btn" tabindex="-1"><span class="well-roster-time">' +
-                escapeHtml(p.time || "—") +
-                '</span><span class="well-roster-name">' +
-                escapeHtml(a.patientName || "Patient") +
-                '</span><span class="well-muted">' +
-                escapeHtml(a.reason || "") +
-                "</span></div>") +
-            '<button type="button" class="well-icon-btn well-appt-cancel" data-well-appt-cancel="' +
-            escapeHtml(a.id || "") +
-            '" aria-label="Cancel appointment for ' +
-            escapeHtml(a.patientName || "patient") +
-            ' at ' +
-            escapeHtml(p.time || "") +
-            '">×</button>' +
-            "</div></li>"
-          );
-        })
-        .join("") +
-      "</ul>"
-    );
-  }
-
   function renderScheduleForm(data, dateIso) {
+    var CC = window.WellCalendarConnect;
+    var cc = CC ? CC.normalize(data.calendarConnect) : null;
+    var selectedId = (data.prefs && data.prefs.selectedRosterId) || "";
     var rosterOpts = (data.roster || [])
       .map(function (r) {
         return (
           '<option value="' +
           escapeHtml(r.id) +
-          '">' +
+          '"' +
+          (r.id === selectedId ? " selected" : "") +
+          ">" +
           escapeHtml(r.name) +
           "</option>"
         );
       })
       .join("");
     var clinic = (data.provider && data.provider.clinic) || "Hyde Park Family Medicine";
+    var visitLabel = "";
+    var extra = "";
+    if (CC && cc) {
+      var visit = CC.visitById(cc.bookVisitType);
+      visitLabel = visit ? visit.label : "";
+      extra =
+        '<div class="well-field">' +
+        '<label for="well-sched-clinician">Clinician</label>' +
+        '<select id="well-sched-clinician" name="clinicianId" data-well-sched="clinicianId" data-well-book-clinician>' +
+        doctorOptions(cc.bookClinicianId) +
+        "</select></div>" +
+        '<div class="well-field">' +
+        '<label for="well-sched-visit">Visit type</label>' +
+        '<select id="well-sched-visit" name="visitType" data-well-sched="visitType" data-well-book-visit>' +
+        visitOptions(cc.bookVisitType) +
+        "</select></div>";
+    }
+    var slotMount = "";
+    if (CC && cc) {
+      var selectedRow = (data.roster || []).filter(function (r) {
+        return r.id === selectedId;
+      })[0];
+      slotMount =
+        '<div data-well-slot-mount>' +
+        renderSlotMount(data, "provider", {
+          clinicianId: cc.bookClinicianId,
+          visitType: cc.bookVisitType,
+          patientId: selectedId,
+          patientName: selectedRow ? selectedRow.name : "",
+          reason: visitLabel,
+        }) +
+        "</div>";
+    }
     return (
       '<form class="well-schedule-form" data-well-schedule-form>' +
       '<div class="well-field">' +
@@ -468,6 +517,7 @@
       '<label for="well-sched-time">Time</label>' +
       '<input type="time" id="well-sched-time" name="time" data-well-sched="time" value="09:00" required>' +
       "</div>" +
+      extra +
       '<div class="well-field">' +
       '<label for="well-sched-patient">Patient</label>' +
       '<select id="well-sched-patient" name="patientId" data-well-sched="patientId">' +
@@ -481,7 +531,9 @@
       "</div>" +
       '<div class="well-field">' +
       '<label for="well-sched-reason">Reason</label>' +
-      '<input type="text" id="well-sched-reason" name="reason" data-well-sched="reason" placeholder="Visit reason" required>' +
+      '<input type="text" id="well-sched-reason" name="reason" data-well-sched="reason" placeholder="Visit reason" value="' +
+      escapeHtml(visitLabel) +
+      '" required>' +
       "</div>" +
       '<div class="well-field">' +
       '<label for="well-sched-where">Location / clinic</label>' +
@@ -489,6 +541,8 @@
       escapeHtml(clinic) +
       '" required>' +
       "</div>" +
+      slotMount +
+      '<p class="well-sched-note" data-well-sched-note></p>' +
       '<button type="submit" class="btn btn-primary well-mini-btn">Add appointment</button>' +
       "</form>"
     );
@@ -599,7 +653,12 @@
       }
     }
     base.appleHealth = mergeAppleHealthAppendOnly(base.appleHealth, raw.appleHealth);
-    base.version = Math.max(5, Number(raw.version) || 0, Number(base.version) || 0);
+    if (window.WellCalendarConnect) {
+      base.calendarConnect = window.WellCalendarConnect.normalize(raw.calendarConnect);
+    } else if (raw.calendarConnect && typeof raw.calendarConnect === "object") {
+      base.calendarConnect = raw.calendarConnect;
+    }
+    base.version = Math.max(6, Number(raw.version) || 0, Number(base.version) || 0);
     return ensureCalPrefs(ensureAppleHealth(base));
   }
 
@@ -708,7 +767,10 @@
         /* Apple Health: consent may change; uploads + audit are append-only */
         data.appleHealth = mergeAppleHealthAppendOnly(prev.appleHealth, data.appleHealth);
         ensureAppleHealth(data);
-        data.version = Math.max(5, Number(data.version) || 0);
+        if (window.WellCalendarConnect) {
+          data.calendarConnect = window.WellCalendarConnect.normalize(data.calendarConnect);
+        }
+        data.version = Math.max(6, Number(data.version) || 0);
         localStorage.setItem(PORTAL_KEY, JSON.stringify(data));
         return true;
       } catch (e) {
@@ -2124,6 +2186,839 @@
     );
   }
 
+  function doctorOptions(selectedId) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return "";
+    return CC.doctors()
+      .map(function (d) {
+        return (
+          '<option value="' +
+          escapeHtml(d.id) +
+          '"' +
+          (d.id === selectedId ? " selected" : "") +
+          ">" +
+          escapeHtml(d.name) +
+          "</option>"
+        );
+      })
+      .join("");
+  }
+
+  function visitOptions(selectedId) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return "";
+    return CC.VISIT_TYPES.map(function (v) {
+      return (
+        '<option value="' +
+        escapeHtml(v.id) +
+        '"' +
+        (v.id === selectedId ? " selected" : "") +
+        ">" +
+        escapeHtml(v.label) +
+        "</option>"
+      );
+    }).join("");
+  }
+
+  function patientOwnsAppt(data, appt) {
+    var pname = (data.patient && data.patient.name) || "";
+    if (!appt) return false;
+    if (appt.patientId === "p1") return true;
+    if (appt.patientName && pname && appt.patientName === pname) return true;
+    if (!appt.patientId && !appt.patientName) return true;
+    return false;
+  }
+
+  function normalizeClock(time) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return String(time || "");
+    var mins = CC.timeToMin(time);
+    if (isNaN(mins)) return "";
+    return CC.minToTime(mins);
+  }
+
+  function isDemoPatientDraft(data, draft) {
+    if (!draft) return false;
+    if (draft.patientId === "p1") return true;
+    var pname = data.patient && data.patient.name;
+    return !!(pname && draft.patientName && draft.patientName === pname);
+  }
+
+  function schedulingDraft(host, data, side) {
+    var CC = window.WellCalendarConnect;
+    var cc = CC.normalize(data.calendarConnect);
+    var clinicianId = cc.bookClinicianId;
+    var visitType = cc.bookVisitType;
+    var patientId = side === "patient" ? "p1" : (data.prefs && data.prefs.selectedRosterId) || "";
+    var patientName = side === "patient" ? (data.patient && data.patient.name) || "" : "";
+    var reason = "";
+    if (host && side === "provider") {
+      var clinEl = host.querySelector('[data-well-sched="clinicianId"]');
+      var visitEl = host.querySelector('[data-well-sched="visitType"]');
+      var pidEl = host.querySelector('[data-well-sched="patientId"]');
+      var pnameEl = host.querySelector('[data-well-sched="patientName"]');
+      var reasonEl = host.querySelector('[data-well-sched="reason"]');
+      if (clinEl && clinEl.value) clinicianId = clinEl.value;
+      if (visitEl && visitEl.value) visitType = visitEl.value;
+      if (pidEl) patientId = pidEl.value || "";
+      if (pnameEl && pnameEl.value.trim()) patientName = pnameEl.value.trim();
+      if (reasonEl) reason = reasonEl.value.trim();
+    } else if (host && side === "patient") {
+      var pClin = host.querySelector("[data-well-book-clinician]");
+      var pVisit = host.querySelector("[data-well-book-visit]");
+      if (pClin && pClin.value) clinicianId = pClin.value;
+      if (pVisit && pVisit.value) visitType = pVisit.value;
+    }
+    if (patientId && !patientName) {
+      var match = (data.roster || []).filter(function (r) {
+        return r.id === patientId;
+      })[0];
+      if (match) patientName = match.name;
+    }
+    if (!reason) {
+      var visit = CC.visitById(visitType);
+      reason = visit ? visit.label : "Visit";
+    }
+    return {
+      clinicianId: clinicianId,
+      visitType: visitType,
+      patientId: patientId,
+      patientName: patientName,
+      reason: reason,
+    };
+  }
+
+  function renderTeamsConnect(data, side) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return "";
+    var cc = CC.normalize(data.calendarConnect);
+    var status = cc.connected
+      ? '<p class="well-connect-status is-on"><span class="well-connect-dot" aria-hidden="true"></span> Connected · ' +
+        escapeHtml(cc.tenant) +
+        "</p>"
+      : '<p class="well-connect-status"><span class="well-connect-dot" aria-hidden="true"></span> Not connected</p>';
+    var account =
+      cc.connected && cc.accountLabel
+        ? '<p class="well-muted well-tiny">' +
+          escapeHtml(cc.accountLabel) +
+          (cc.connectedAt ? " · synced " + escapeHtml(cc.connectedAt) : "") +
+          "</p>"
+        : '<p class="well-muted well-tiny">' + CC.STAFF.length + " clinic employee calendars ready to overlay</p>";
+    var action = cc.connected
+      ? '<button type="button" class="btn btn-secondary well-mini-btn" data-well-cal-disconnect>Disconnect</button>'
+      : '<button type="button" class="btn btn-primary well-mini-btn" data-well-cal-connect>Connect Microsoft 365 / Teams</button>';
+    var toggles = CC.STAFF.map(function (emp) {
+      var on = cc.visibleEmployeeIds.indexOf(emp.id) >= 0;
+      return (
+        '<label class="well-emp-toggle">' +
+        '<input type="checkbox" data-well-emp-toggle="' +
+        escapeHtml(emp.id) +
+        '"' +
+        (on ? " checked" : "") +
+        ">" +
+        '<span class="well-emp-swatch" style="background:' +
+        escapeHtml(emp.color) +
+        '" aria-hidden="true"></span>' +
+        '<span class="well-emp-copy"><span class="well-emp-name">' +
+        escapeHtml(emp.name) +
+        '</span><span class="well-emp-role">' +
+        escapeHtml(emp.role) +
+        "</span></span></label>"
+      );
+    }).join("");
+    var selfToggle =
+      side === "patient"
+        ? '<label class="well-emp-toggle well-emp-toggle--self">' +
+          '<input type="checkbox" data-well-patient-cal-toggle' +
+          (cc.includePatientCalendar ? " checked" : "") +
+          ">" +
+          '<span class="well-emp-swatch well-emp-swatch--self" aria-hidden="true"></span>' +
+          '<span class="well-emp-copy"><span class="well-emp-name">My Outlook busy time</span>' +
+          '<span class="well-emp-role">Skip openings when you are in a meeting</span></span></label>'
+        : "";
+    return (
+      '<div class="well-connect' +
+      (cc.connected ? " is-connected" : "") +
+      '" data-well-connect>' +
+      '<div class="well-connect-head">' +
+      '<span class="well-connect-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>' +
+      "<div><p class=\"well-connect-kicker\">Shared staff calendar</p><strong>Microsoft 365 / Teams</strong>" +
+      status +
+      account +
+      "</div></div>" +
+      action +
+      '<p class="well-muted well-tiny">Demo connector for this clinic’s employee calendars. No live Microsoft Graph sign-in and no token is stored. Busy/free is mock Outlook and Teams data a Graph adapter can replace later.</p>' +
+      '<fieldset class="well-emp-fieldset"><legend>Employee calendars</legend>' +
+      '<div class="well-emp-list" data-well-emp-list>' +
+      toggles +
+      "</div>" +
+      selfToggle +
+      '<p class="well-muted well-tiny">' +
+      (cc.connected
+        ? "Uncheck someone to hide their overlay. Disconnect keeps these picks. Hiding a calendar does not free that person’s meetings."
+        : "Picks are saved. Colored overlays show up after you connect.") +
+      "</p></fieldset></div>"
+    );
+  }
+
+  function renderSlotMount(data, side, draft) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return "";
+    var cc = CC.normalize(data.calendarConnect);
+    draft = draft || schedulingDraft(null, data, side);
+    var demoPatient = side === "patient" || isDemoPatientDraft(data, draft);
+    var result = CC.searchOpenings({
+      now: new Date(),
+      clinicianId: draft.clinicianId,
+      appointments: data.appointments || [],
+      connected: cc.connected,
+      patientId: side === "patient" ? "p1" : draft.patientId,
+      patientName: side === "patient" ? (data.patient && data.patient.name) || "" : draft.patientName,
+      includePatientOutlook: !!(cc.connected && cc.includePatientCalendar && demoPatient),
+      blockOwnVisits: true,
+      count: 5,
+      heldCap: 3,
+    });
+    var visit = CC.visitById(draft.visitType);
+    var reason = (draft.reason && String(draft.reason).trim()) || (visit ? visit.label : "Visit");
+    var doc = CC.staffById(draft.clinicianId);
+    var chips = result.slots.length
+      ? result.slots
+          .map(function (s) {
+            return (
+              '<button type="button" class="well-slot-chip" data-well-slot="' +
+              escapeHtml(s.dateIso + "|" + s.time) +
+              '" data-well-slot-reason="' +
+              escapeHtml(reason) +
+              '" data-well-slot-clinician="' +
+              escapeHtml(draft.clinicianId) +
+              '"><span class="well-slot-chip-when">' +
+              escapeHtml(s.label) +
+              '</span><span class="well-slot-chip-go">Book</span></button>'
+            );
+          })
+          .join("")
+      : '<p class="well-muted well-tiny">No openings in the next 4 weeks.</p>';
+    var held = result.held.length
+      ? '<p class="well-held-label">Held nearby</p><ul class="well-held-list">' +
+        result.held
+          .map(function (h) {
+            return renderHeldRow(h, side);
+          })
+          .join("") +
+        "</ul>"
+      : "";
+    var hint = cc.connected
+      ? "Next openings skip taken clinic times and this doctor's Outlook/Teams busy time" +
+        (demoPatient && cc.includePatientCalendar ? ", plus the patient's own calendar" : "") +
+        "."
+      : "Using clinic hours and WELL appointments only. Connect Teams to fold in employee Outlook busy time.";
+    return (
+      '<div class="well-slots" data-well-slots aria-live="polite">' +
+      '<p class="well-slots-lead">First available' +
+      (doc ? " · " + escapeHtml(doc.short) : "") +
+      "</p>" +
+      '<div class="well-slot-chips" role="group" aria-label="First available appointments">' +
+      chips +
+      "</div>" +
+      held +
+      '<p class="well-muted well-tiny">' +
+      escapeHtml(hint) +
+      "</p></div>"
+    );
+  }
+
+  function renderPatientBook(data) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return "";
+    var cc = CC.normalize(data.calendarConnect);
+    return (
+      '<div class="well-book">' +
+      '<h5 class="well-cal-day-heading">Book a visit</h5>' +
+      '<div class="well-field"><label for="well-book-visit">Visit type</label>' +
+      '<select id="well-book-visit" data-well-book-visit>' +
+      visitOptions(cc.bookVisitType) +
+      "</select></div>" +
+      '<div class="well-field"><label for="well-book-doc">Doctor</label>' +
+      '<select id="well-book-doc" data-well-book-clinician>' +
+      doctorOptions(cc.bookClinicianId) +
+      "</select></div>" +
+      '<div data-well-slot-mount>' +
+      renderSlotMount(data, "patient", {
+        clinicianId: cc.bookClinicianId,
+        visitType: cc.bookVisitType,
+        patientId: "p1",
+        patientName: (data.patient && data.patient.name) || "",
+        reason: (CC.visitById(cc.bookVisitType) || {}).label || "",
+      }) +
+      "</div>" +
+      '<p class="well-muted well-tiny">' +
+      escapeHtml(CC.CLINIC_HOURS_LABEL) +
+      "</p></div>"
+    );
+  }
+
+  /**
+   * Privacy boundary for shared-calendar chrome.
+   * Pills and held rows print only presentForRole() fields. Owned events keep
+   * their title. Every other calendar is Busy / Unavailable.
+   */
+  function renderBusyPill(view, color) {
+    var shown = view.owned ? view.title || view.label : view.label;
+    var who = view.who
+      ? '<span class="well-busy-who">' + escapeHtml(view.who) + "</span>"
+      : "";
+    var src =
+      view.owned && view.sourceLabel
+        ? '<span class="well-src-tag">' + escapeHtml(view.sourceLabel) + "</span>"
+        : "";
+    var privateCls = view.owned ? "" : " well-busy-pill--private";
+    var selfCls = view.owned ? " well-busy-pill--self" : "";
+    return (
+      '<span class="well-busy-pill' +
+      privateCls +
+      selfCls +
+      '" style="--emp:' +
+      escapeHtml(color || "#8a96a3") +
+      '" aria-label="' +
+      escapeHtml((view.who ? view.who + ", " : "") + shown) +
+      '">' +
+      who +
+      '<span class="well-busy-title">' +
+      escapeHtml(shown) +
+      "</span>" +
+      src +
+      "</span>"
+    );
+  }
+
+  function renderHeldRow(held, side) {
+    var CC = window.WellCalendarConnect;
+    var view = CC.presentForRole(
+      {
+        kind: held.kind,
+        title: held.title,
+        source: held.source,
+        employeeId: held.employeeId,
+      },
+      side === "provider" ? "provider" : "patient",
+      "held"
+    );
+    var who = view.who ? escapeHtml(view.who) + " · " : "";
+    var text = view.owned ? view.title || view.label : view.label;
+    var src =
+      view.owned && view.sourceLabel
+        ? ' <span class="well-src-tag">' + escapeHtml(view.sourceLabel) + "</span>"
+        : "";
+    return (
+      "<li><span class=\"well-held-when\">" +
+      escapeHtml(held.label) +
+      "</span> " +
+      who +
+      escapeHtml(text) +
+      src +
+      "</li>"
+    );
+  }
+
+  function renderOwnApptChip(a) {
+    return (
+      '<div class="well-own-appt"><strong>' +
+      escapeHtml(a.reason || "Visit") +
+      "</strong>" +
+      (a.clinicianName ? '<span class="well-muted">' + escapeHtml(a.clinicianName) + "</span>" : "") +
+      (a.where ? '<span class="well-muted">' + escapeHtml(a.where) + "</span>" : "") +
+      "</div>"
+    );
+  }
+
+  function renderProviderApptRow(data, a) {
+    var p = parseWhen(a.when);
+    var on = a.patientId && data.prefs && a.patientId === data.prefs.selectedRosterId;
+    var detail =
+      escapeHtml(a.reason || "") +
+      (a.clinicianName ? " · " + escapeHtml(a.clinicianName) : "");
+    var open = a.patientId
+      ? '<button type="button" class="well-roster-btn well-appt-open" data-well-roster="' +
+        escapeHtml(a.patientId) +
+        '" aria-pressed="' +
+        (on ? "true" : "false") +
+        '"><span class="well-roster-time">' +
+        escapeHtml(p.time || "—") +
+        '</span><span class="well-roster-name">' +
+        escapeHtml(a.patientName || "Patient") +
+        '</span><span class="well-muted">' +
+        detail +
+        "</span></button>"
+      : '<div class="well-roster-btn" tabindex="-1"><span class="well-roster-time">' +
+        escapeHtml(p.time || "—") +
+        '</span><span class="well-roster-name">' +
+        escapeHtml(a.patientName || "Patient") +
+        '</span><span class="well-muted">' +
+        detail +
+        "</span></div>";
+    return (
+      '<div class="well-appt-row' +
+      (on ? " is-selected" : "") +
+      '">' +
+      open +
+      '<button type="button" class="well-icon-btn well-appt-cancel" data-well-appt-cancel="' +
+      escapeHtml(a.id || "") +
+      '" aria-label="Cancel appointment for ' +
+      escapeHtml(a.patientName || "patient") +
+      " at " +
+      escapeHtml(p.time || "") +
+      '">×</button></div>'
+    );
+  }
+
+  function renderClinicSchedule(data, dateIso) {
+    var list = appointmentsForDate(data, dateIso);
+    var body = list.length
+      ? '<div class="well-roster">' +
+        list
+          .map(function (a) {
+            return renderProviderApptRow(data, a);
+          })
+          .join("") +
+        "</div>"
+      : '<p class="well-muted well-tiny">No clinic visits on this day.</p>';
+    return (
+      '<div class="well-clinic-schedule" data-well-clinic-schedule>' +
+      '<h5 class="well-cal-day-heading">Clinic schedule · provider only</h5>' +
+      '<p class="well-privacy-note">Patient names and visit reasons stay in this list. They are not on the shared calendar overlay.</p>' +
+      body +
+      "</div>"
+    );
+  }
+
+  function renderDayBoard(data, dateIso, side) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return "";
+    var cc = CC.normalize(data.calendarConnect);
+    var starts = CC.slotStarts(dateIso).slice();
+    var appts = appointmentsForDate(data, dateIso);
+    var times = starts.slice();
+    if (side === "patient") {
+      appts.forEach(function (a) {
+        if (!patientOwnsAppt(data, a)) return;
+        var iv = CC.appointmentInterval(a);
+        if (!iv || times.indexOf(iv.start) >= 0) return;
+        times.push(iv.start);
+      });
+    }
+    times.sort(function (a, b) {
+      return a - b;
+    });
+    if (!times.length) {
+      return '<p class="well-muted well-tiny">Clinic is closed this day. Visits are weekdays, 9:00 AM–12:00 PM and 1:00–4:30 PM.</p>';
+    }
+    var rows = times
+      .map(function (startMin) {
+        var end = startMin + 30;
+        var pills = [];
+        var apptHtml = "";
+        var clinicBooked = false;
+        if (cc.connected) {
+          cc.visibleEmployeeIds.forEach(function (id) {
+            var emp = CC.staffById(id);
+            if (!emp) return;
+            CC.eventsOn(id, dateIso).forEach(function (ev) {
+              if (!CC.overlaps(startMin, end, ev.startMin, ev.endMin)) return;
+              var view = CC.presentForRole(
+                {
+                  kind: "employee",
+                  title: ev.title,
+                  source: ev.source,
+                  employeeId: id,
+                },
+                side,
+                "board"
+              );
+              pills.push(renderBusyPill(view, emp.color));
+            });
+          });
+          if (side === "patient" && cc.includePatientCalendar) {
+            CC.eventsOn(CC.PATIENT_CAL_ID, dateIso).forEach(function (ev) {
+              if (!CC.overlaps(startMin, end, ev.startMin, ev.endMin)) return;
+              var selfView = CC.presentForRole(
+                {
+                  kind: "outlook-self",
+                  title: ev.title,
+                  source: ev.source,
+                  employeeId: CC.PATIENT_CAL_ID,
+                },
+                "patient",
+                "board"
+              );
+              pills.push(renderBusyPill(selfView, "#107c10"));
+            });
+          }
+        }
+        appts.forEach(function (a) {
+          var iv = CC.appointmentInterval(a);
+          if (!iv || !CC.overlaps(startMin, end, iv.start, iv.end)) return;
+          if (side === "patient" && patientOwnsAppt(data, a) && iv.start === startMin) {
+            apptHtml += renderOwnApptChip(a);
+          } else {
+            clinicBooked = true;
+          }
+        });
+        if (clinicBooked) {
+          pills.unshift(
+            renderBusyPill(
+              CC.presentForRole(
+                { kind: "appointment", title: "", source: "well" },
+                side === "provider" ? "provider" : "patient",
+                "board"
+              ),
+              "#8a96a3"
+            )
+          );
+        }
+        var open = !apptHtml && !pills.length;
+        var body = open ? '<span class="well-slot-open">Open</span>' : apptHtml + pills.join("");
+        return (
+          '<div class="well-day-row' +
+          (open ? " is-open" : " is-busy") +
+          '"><div class="well-day-time">' +
+          escapeHtml(CC.formatTimeLabel(CC.minToTime(startMin))) +
+          '</div><div class="well-day-body">' +
+          body +
+          "</div></div>"
+        );
+      })
+      .join("");
+    return '<div class="well-dayboard" data-well-dayboard>' + rows + "</div>";
+  }
+
+  function commitAppointment(cur, fields) {
+    cur = ensureCalPrefs(cur || PortalStore.get());
+    var CC = window.WellCalendarConnect;
+    var time = normalizeClock(fields.time);
+    var date = fields.date;
+    if (!date || !time || !fields.patientName || !fields.reason) return cur;
+    var emp = CC && fields.clinicianId ? CC.staffById(fields.clinicianId) : null;
+    var appt = {
+      id: newAppointmentId(),
+      when: date + " " + time,
+      patientId: fields.patientId || "",
+      patientName: fields.patientName,
+      reason: fields.reason,
+      where: fields.where || (cur.provider && cur.provider.clinic) || "",
+      clinicianId: fields.clinicianId || "",
+      clinicianName: (emp && emp.name) || fields.clinicianName || "",
+      source: fields.source || "manual",
+    };
+    cur.appointments = (cur.appointments || []).slice();
+    cur.appointments.push(appt);
+    cur.prefs.selectedCalDate = date;
+    var dp = String(date).split("-");
+    if (dp.length === 3) {
+      cur.prefs.calYear = parseInt(dp[0], 10);
+      cur.prefs.calMonth = parseInt(dp[1], 10) - 1;
+    }
+    if (fields.patientId) cur.prefs.selectedRosterId = fields.patientId;
+    cur.prefs.lastBookedId = appt.id;
+    if (CC) {
+      cur.calendarConnect = CC.setBookPrefs(cur.calendarConnect, {
+        clinicianId: fields.clinicianId,
+        visitType: fields.visitType,
+      });
+    }
+    PortalStore.save(cur);
+    return PortalStore.get();
+  }
+
+  function syncVisitReason(host) {
+    var CC = window.WellCalendarConnect;
+    if (!CC || !host) return;
+    var visitEl = host.querySelector('[data-well-sched="visitType"]');
+    var reasonEl = host.querySelector('[data-well-sched="reason"]');
+    if (!visitEl || !reasonEl) return;
+    var visit = CC.visitById(visitEl.value);
+    if (!visit) return;
+    var current = reasonEl.value.trim();
+    var known = CC.VISIT_TYPES.some(function (v) {
+      return v.label === current;
+    });
+    if (!current || known) reasonEl.value = visit.label;
+  }
+
+  function fillSchedFields(host, date, time, reason) {
+    var dateEl = host.querySelector('[data-well-sched="date"]');
+    var timeEl = host.querySelector('[data-well-sched="time"]');
+    var reasonEl = host.querySelector('[data-well-sched="reason"]');
+    if (dateEl && date) dateEl.value = date;
+    if (timeEl && time) timeEl.value = time;
+    if (reasonEl && reason) reasonEl.value = reason;
+  }
+
+  function rerenderSide(root, side) {
+    var cur = PortalStore.get();
+    if (side === "provider") renderProvider(root, cur);
+    else renderPatient(root, cur);
+  }
+
+  function bindSlotButtons(root, host, side) {
+    host.querySelectorAll("[data-well-slot]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var parts = String(btn.getAttribute("data-well-slot") || "").split("|");
+        var date = parts[0];
+        var time = parts[1];
+        var clinicianId = btn.getAttribute("data-well-slot-clinician") || "";
+        var reason = btn.getAttribute("data-well-slot-reason") || "Visit";
+        var cur = PortalStore.get();
+        var draft = schedulingDraft(host, cur, side);
+        var patientId = side === "patient" ? "p1" : draft.patientId;
+        var patientName =
+          side === "patient" ? (cur.patient && cur.patient.name) || "" : draft.patientName;
+        if (side === "provider" && !patientName) {
+          fillSchedFields(host, date, time, reason);
+          var note = host.querySelector("[data-well-sched-note]");
+          if (note) note.textContent = "Choose a patient, then book this time or use Add appointment.";
+          var nameInput = host.querySelector('[data-well-sched="patientName"]');
+          if (nameInput) nameInput.focus();
+          return;
+        }
+        commitAppointment(cur, {
+          date: date,
+          time: time,
+          patientId: patientId,
+          patientName: patientName,
+          reason: side === "provider" && draft.reason ? draft.reason : reason,
+          where: (cur.provider && cur.provider.clinic) || "",
+          clinicianId: clinicianId || draft.clinicianId,
+          visitType: draft.visitType,
+          source: "first-available",
+        });
+        rerenderSide(root, side);
+      });
+    });
+  }
+
+  function refreshSlotMount(root, host, side) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return;
+    var mount = host.querySelector("[data-well-slot-mount]");
+    if (!mount) return;
+    syncVisitReason(host);
+    var cur = PortalStore.get();
+    var draft = schedulingDraft(host, cur, side);
+    cur.calendarConnect = CC.setBookPrefs(cur.calendarConnect, {
+      clinicianId: draft.clinicianId,
+      visitType: draft.visitType,
+    });
+    PortalStore.save(cur);
+    var fresh = PortalStore.get();
+    draft = schedulingDraft(host, fresh, side);
+    mount.innerHTML = renderSlotMount(fresh, side, draft);
+    bindSlotButtons(root, host, side);
+  }
+
+  function bindSharedCalendar(root, host, side) {
+    if (!host) return;
+    function shiftMonth(delta) {
+      var cur = ensureCalPrefs(PortalStore.get());
+      cur.prefs.calMonth += delta;
+      if (cur.prefs.calMonth < 0) {
+        cur.prefs.calMonth = 11;
+        cur.prefs.calYear -= 1;
+      }
+      if (cur.prefs.calMonth > 11) {
+        cur.prefs.calMonth = 0;
+        cur.prefs.calYear += 1;
+      }
+      PortalStore.save(cur);
+      rerenderSide(root, side);
+    }
+    var prevBtn = host.querySelector("[data-well-cal-prev]");
+    var nextBtn = host.querySelector("[data-well-cal-next]");
+    if (prevBtn) {
+      prevBtn.addEventListener("click", function () {
+        shiftMonth(-1);
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener("click", function () {
+        shiftMonth(1);
+      });
+    }
+    host.querySelectorAll("[data-well-cal-day]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var cur = ensureCalPrefs(PortalStore.get());
+        var day = btn.getAttribute("data-well-cal-day");
+        cur.prefs.selectedCalDate = day;
+        var parts = String(day || "").split("-");
+        if (parts.length === 3) {
+          cur.prefs.calYear = parseInt(parts[0], 10);
+          cur.prefs.calMonth = parseInt(parts[1], 10) - 1;
+        }
+        PortalStore.save(cur);
+        rerenderSide(root, side);
+      });
+    });
+    var connectBtn = host.querySelector("[data-well-cal-connect]");
+    if (connectBtn) {
+      connectBtn.addEventListener("click", function () {
+        var CC = window.WellCalendarConnect;
+        if (!CC) return;
+        var cur = PortalStore.get();
+        var label =
+          side === "provider"
+            ? ((cur.provider && cur.provider.clinic) || "Clinic") + " · shared staff calendars"
+            : ((cur.patient && cur.patient.name) || "Patient") +
+              (cur.patient && cur.patient.email ? " · " + cur.patient.email : "");
+        cur.calendarConnect = CC.connect(cur.calendarConnect, label, nowStamp());
+        PortalStore.save(cur);
+        rerenderSide(root, side);
+      });
+    }
+    var disconnectBtn = host.querySelector("[data-well-cal-disconnect]");
+    if (disconnectBtn) {
+      disconnectBtn.addEventListener("click", function () {
+        var CC = window.WellCalendarConnect;
+        if (!CC) return;
+        var cur = PortalStore.get();
+        cur.calendarConnect = CC.disconnect(cur.calendarConnect);
+        PortalStore.save(cur);
+        rerenderSide(root, side);
+      });
+    }
+    host.querySelectorAll("[data-well-emp-toggle]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var CC = window.WellCalendarConnect;
+        if (!CC) return;
+        var cur = PortalStore.get();
+        cur.calendarConnect = CC.setVisible(
+          cur.calendarConnect,
+          input.getAttribute("data-well-emp-toggle"),
+          input.checked
+        );
+        PortalStore.save(cur);
+        rerenderSide(root, side);
+      });
+    });
+    var selfToggle = host.querySelector("[data-well-patient-cal-toggle]");
+    if (selfToggle) {
+      selfToggle.addEventListener("change", function () {
+        var CC = window.WellCalendarConnect;
+        if (!CC) return;
+        var cur = PortalStore.get();
+        cur.calendarConnect = CC.setIncludePatientCalendar(cur.calendarConnect, selfToggle.checked);
+        PortalStore.save(cur);
+        rerenderSide(root, side);
+      });
+    }
+    host.querySelectorAll("[data-well-book-visit], [data-well-book-clinician]").forEach(function (el) {
+      el.addEventListener("change", function () {
+        refreshSlotMount(root, host, side);
+      });
+    });
+    var pidEl = host.querySelector('[data-well-sched="patientId"]');
+    var pnameInput = host.querySelector('[data-well-sched="patientName"]');
+    if (pidEl && pnameInput) {
+      pidEl.addEventListener("change", function () {
+        var id = pidEl.value;
+        if (id) {
+          var match = (PortalStore.get().roster || []).filter(function (r) {
+            return r.id === id;
+          })[0];
+          if (match) pnameInput.value = match.name;
+        }
+        refreshSlotMount(root, host, side);
+      });
+    }
+    if (pnameInput) {
+      pnameInput.addEventListener("change", function () {
+        refreshSlotMount(root, host, side);
+      });
+    }
+    var form = host.querySelector("[data-well-schedule-form]");
+    if (form && side === "provider") {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var cur = ensureCalPrefs(PortalStore.get());
+        var draft = schedulingDraft(host, cur, "provider");
+        var dateEl = form.querySelector('[data-well-sched="date"]');
+        var timeEl = form.querySelector('[data-well-sched="time"]');
+        var whereEl = form.querySelector('[data-well-sched="where"]');
+        var date = (dateEl && dateEl.value) || cur.prefs.selectedCalDate;
+        var time = normalizeClock((timeEl && timeEl.value) || "");
+        var where = (whereEl && whereEl.value.trim()) || "";
+        if (!draft.patientName) {
+          if (pnameInput) pnameInput.focus();
+          return;
+        }
+        if (!date || !time || !draft.reason || !where) return;
+        commitAppointment(cur, {
+          date: date,
+          time: time,
+          patientId: draft.patientId,
+          patientName: draft.patientName,
+          reason: draft.reason,
+          where: where,
+          clinicianId: draft.clinicianId,
+          visitType: draft.visitType,
+          source: "manual",
+        });
+        rerenderSide(root, "provider");
+      });
+    }
+    bindSlotButtons(root, host, side);
+  }
+
+  function renderUpcomingAppointments(data) {
+    var CC = window.WellCalendarConnect;
+    var today = new Date();
+    var todayIso = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
+    var lastId = data.prefs && data.prefs.lastBookedId;
+    var mine = patientFacingAppointments(data).slice().sort(function (a, b) {
+      return String(a.when || "").localeCompare(String(b.when || ""));
+    });
+    var upcoming = [];
+    var earlier = [];
+    mine.forEach(function (a) {
+      var d = parseWhen(a.when).date;
+      if (d && d >= todayIso) upcoming.push(a);
+      else earlier.push(a);
+    });
+    function item(a) {
+      var p = parseWhen(a.when);
+      var whenLabel = a.when;
+      if (CC && p.date) whenLabel = CC.formatWhen(p.date, p.time || "00:00");
+      var just = a.id && a.id === lastId ? " is-just-booked" : "";
+      return (
+        '<li class="well-appt-item' +
+        just +
+        '"><strong>' +
+        escapeHtml(whenLabel) +
+        "</strong><br>" +
+        escapeHtml(a.reason || "") +
+        (a.clinicianName ? "<br><span class=\"well-muted\">" + escapeHtml(a.clinicianName) + "</span>" : "") +
+        "<br><span class=\"well-muted\">" +
+        escapeHtml(a.where || "") +
+        "</span></li>"
+      );
+    }
+    var html =
+      '<section class="well-rail-card" data-well-upcoming><h4>Upcoming appointments</h4><ul class="well-list">';
+    html += upcoming.length
+      ? upcoming.map(item).join("")
+      : '<li class="well-muted">No upcoming appointments.</li>';
+    html += "</ul>";
+    if (earlier.length) {
+      html +=
+        '<details class="well-earlier"><summary>Earlier (' +
+        earlier.length +
+        ")</summary><ul class=\"well-list\">" +
+        earlier.map(item).join("") +
+        "</ul></details>";
+    }
+    html += "</section>";
+    return html;
+  }
+
   function renderPatient(root, data, forceSection) {
     var host = root.querySelector("[data-well-patient-root]");
     if (!host) return;
@@ -2131,28 +3026,30 @@
     var sectionId = forceSection || data.prefs.lastSection || "intake";
     if (!CHART_SECTIONS.some(function (s) { return s.id === sectionId; })) sectionId = "intake";
 
-    /* Patient rail: own appointments + messages only — never a providers directory/list */
-    var myAppts = patientFacingAppointments(data);
+    /* Patient rail: own appointments + messages only — never other patients' names.
+       Staff free/busy overlays are the shared clinic calendar, not a directory of patients. */
+    data = ensureCalPrefs(data);
+    var selectedDate = data.prefs.selectedCalDate;
+    var dayLabel = window.WellCalendarConnect
+      ? window.WellCalendarConnect.formatDay(selectedDate)
+      : selectedDate;
     var apptHtml =
-      '<aside class="well-side-rail" aria-label="Appointments and messages">' +
-      '<section class="well-rail-card">' +
-      "<h4>Upcoming appointments</h4><ul class=\"well-list\">" +
-      (myAppts.length
-        ? myAppts
-            .map(function (a) {
-              return (
-                "<li><strong>" +
-                escapeHtml(a.when) +
-                "</strong><br>" +
-                escapeHtml(a.reason) +
-                "<br><span class=\"well-muted\">" +
-                escapeHtml(a.where) +
-                "</span></li>"
-              );
-            })
-            .join("")
-        : '<li class="well-muted">No upcoming appointments.</li>') +
-      "</ul></section>" +
+      '<aside class="well-side-rail" aria-label="Schedule, appointments, and messages">' +
+      '<section class="well-rail-card well-rail-card--schedule" data-well-schedule-card>' +
+      "<h4>Schedule</h4>" +
+      '<p class="well-muted well-tiny">Shared clinic calendar · book the next open visit with your doctor.</p>' +
+      '<p class="well-privacy-note">Shared overlay is Busy / Free except your own calendar. Other people\u2019s titles, names, reasons, and notes stay hidden. Your visits and your Outlook events show in full.</p>' +
+      renderTeamsConnect(data, "patient") +
+      renderMonthCalendar(data, { side: "patient" }) +
+      '<div class="well-cal-daypanel">' +
+      '<h5 class="well-cal-day-heading">Day board · ' +
+      escapeHtml(dayLabel) +
+      "</h5>" +
+      renderDayBoard(data, selectedDate, "patient") +
+      "</div>" +
+      renderPatientBook(data) +
+      "</section>" +
+      renderUpcomingAppointments(data) +
       '<section class="well-rail-card">' +
       "<h4>Messages with your doctor</h4>" +
       '<div class="well-thread" role="log" aria-label="Doctor to patient messages">' +
@@ -2238,6 +3135,11 @@
           prev.appleHealth,
           prev.appleHealth
         );
+        if (window.WellCalendarConnect) {
+          fresh.calendarConnect = window.WellCalendarConnect.normalize(prev.calendarConnect);
+        } else if (prev.calendarConnect) {
+          fresh.calendarConnect = deepClone(prev.calendarConnect);
+        }
         appendAppleHealthAudit(
           fresh,
           "chart_reset",
@@ -2254,6 +3156,7 @@
     }
 
     WellCall.afterRender(root, "patient");
+    bindSharedCalendar(root, host, "patient");
 
     var ptForm = host.querySelector("[data-well-patient-compose]");
     if (ptForm) {
@@ -2293,7 +3196,10 @@
         };
 
     var selectedDate = data.prefs.selectedCalDate;
-    var dayListHtml = renderDayAppointmentsList(data, selectedDate);
+    var dayLabel = window.WellCalendarConnect
+      ? window.WellCalendarConnect.formatDay(selectedDate)
+      : selectedDate;
+    var dayListHtml = renderDayBoard(data, selectedDate, "provider");
 
     var rosterHtml =
       '<aside class="well-side-rail" aria-label="Schedule and inbox">' +
@@ -2319,18 +3225,21 @@
         : "") +
       "</p></section>" +
       WellCall.renderPanelHtml("provider", data) +
-      '<section class="well-rail-card well-rail-card--calendar">' +
-      "<h4>Schedule calendar</h4>" +
-      renderMonthCalendar(data) +
+      '<section class="well-rail-card well-rail-card--calendar well-rail-card--schedule" data-well-schedule-card>' +
+      "<h4>Team schedule</h4>" +
+      '<p class="well-muted well-tiny">Shared employee calendars · suggest the next open visit, or add one yourself.</p>' +
+      '<p class="well-privacy-note">Shared overlay is Busy / Free except your own calendar. Other employees\u2019 subjects stay hidden. Patient names are only in the clinic schedule under the board.</p>' +
+      renderTeamsConnect(data, "provider") +
+      renderMonthCalendar(data, { side: "provider" }) +
       '<div class="well-cal-daypanel">' +
-      '<h5 class="well-cal-day-heading">Appointments · ' +
-      escapeHtml(selectedDate) +
+      '<h5 class="well-cal-day-heading">Day board · ' +
+      escapeHtml(dayLabel) +
       "</h5>" +
-      '<div data-well-day-appts>' +
       dayListHtml +
-      "</div></div>" +
+      "</div>" +
+      renderClinicSchedule(data, selectedDate) +
       '<div class="well-cal-add">' +
-      "<h5 class=\"well-cal-day-heading\">Add appointment</h5>" +
+      "<h5 class=\"well-cal-day-heading\">Suggest first available · add appointment</h5>" +
       renderScheduleForm(data, selectedDate) +
       "</div></section>" +
       '<section class="well-rail-card">' +
@@ -2421,48 +3330,6 @@
       });
     });
 
-    var prevBtn = host.querySelector("[data-well-cal-prev]");
-    var nextBtn = host.querySelector("[data-well-cal-next]");
-    if (prevBtn) {
-      prevBtn.addEventListener("click", function () {
-        var cur = ensureCalPrefs(PortalStore.get());
-        cur.prefs.calMonth -= 1;
-        if (cur.prefs.calMonth < 0) {
-          cur.prefs.calMonth = 11;
-          cur.prefs.calYear -= 1;
-        }
-        PortalStore.save(cur);
-        renderProvider(root, cur);
-      });
-    }
-    if (nextBtn) {
-      nextBtn.addEventListener("click", function () {
-        var cur = ensureCalPrefs(PortalStore.get());
-        cur.prefs.calMonth += 1;
-        if (cur.prefs.calMonth > 11) {
-          cur.prefs.calMonth = 0;
-          cur.prefs.calYear += 1;
-        }
-        PortalStore.save(cur);
-        renderProvider(root, cur);
-      });
-    }
-
-    host.querySelectorAll("[data-well-cal-day]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var cur = ensureCalPrefs(PortalStore.get());
-        var day = btn.getAttribute("data-well-cal-day");
-        cur.prefs.selectedCalDate = day;
-        var parts = day.split("-");
-        if (parts.length === 3) {
-          cur.prefs.calYear = parseInt(parts[0], 10);
-          cur.prefs.calMonth = parseInt(parts[1], 10) - 1;
-        }
-        PortalStore.save(cur);
-        renderProvider(root, cur);
-      });
-    });
-
     host.querySelectorAll("[data-well-appt-cancel]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var id = btn.getAttribute("data-well-appt-cancel");
@@ -2476,73 +3343,7 @@
       });
     });
 
-    var form = host.querySelector("[data-well-schedule-form]");
-    if (form) {
-      form.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var cur = ensureCalPrefs(PortalStore.get());
-        var dateEl = form.querySelector('[data-well-sched="date"]');
-        var timeEl = form.querySelector('[data-well-sched="time"]');
-        var pidEl = form.querySelector('[data-well-sched="patientId"]');
-        var pnameEl = form.querySelector('[data-well-sched="patientName"]');
-        var reasonEl = form.querySelector('[data-well-sched="reason"]');
-        var whereEl = form.querySelector('[data-well-sched="where"]');
-        var date = (dateEl && dateEl.value) || cur.prefs.selectedCalDate;
-        var time = (timeEl && timeEl.value) || "09:00";
-        if (time.length === 5) {
-          /* ok */
-        } else if (time.length === 4) {
-          time = "0" + time;
-        }
-        var patientId = (pidEl && pidEl.value) || "";
-        var patientName = (pnameEl && pnameEl.value.trim()) || "";
-        if (patientId) {
-          var match = (cur.roster || []).filter(function (r) {
-            return r.id === patientId;
-          })[0];
-          if (match) patientName = match.name;
-        }
-        if (!patientName) {
-          if (pnameEl) pnameEl.focus();
-          return;
-        }
-        var reason = (reasonEl && reasonEl.value.trim()) || "";
-        var where = (whereEl && whereEl.value.trim()) || "";
-        if (!date || !time || !reason || !where) return;
-
-        cur.appointments = cur.appointments || [];
-        cur.appointments.push({
-          id: newAppointmentId(),
-          when: date + " " + time,
-          patientId: patientId || "",
-          patientName: patientName,
-          reason: reason,
-          where: where,
-        });
-        cur.prefs.selectedCalDate = date;
-        var dp = date.split("-");
-        if (dp.length === 3) {
-          cur.prefs.calYear = parseInt(dp[0], 10);
-          cur.prefs.calMonth = parseInt(dp[1], 10) - 1;
-        }
-        if (patientId) cur.prefs.selectedRosterId = patientId;
-        PortalStore.save(cur);
-        renderProvider(root, cur);
-      });
-
-      var pidSelect = form.querySelector('[data-well-sched="patientId"]');
-      var pnameInput = form.querySelector('[data-well-sched="patientName"]');
-      if (pidSelect && pnameInput) {
-        pidSelect.addEventListener("change", function () {
-          var id = pidSelect.value;
-          if (!id) return;
-          var match = (PortalStore.get().roster || []).filter(function (r) {
-            return r.id === id;
-          })[0];
-          if (match) pnameInput.value = match.name;
-        });
-      }
-    }
+    bindSharedCalendar(root, host, "provider");
 
     WellCall.afterRender(root, "provider");
     root.querySelectorAll("[data-well-jobs-link]").forEach(function (a) {
