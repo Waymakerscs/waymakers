@@ -6,7 +6,7 @@
 (function () {
   "use strict";
 
-  var config = window.CognationConfig || {};
+  var config = window.WAYMAKERSConfig || window.CognationConfig || {};
   var url = String(config.supabaseUrl || "").replace(/\/$/, "");
   var key = String(config.supabasePublishableKey || "");
   var SESSION_KEY = "waymakers.supabase.session.v1";
@@ -127,7 +127,7 @@
     });
   }
 
-  window.CognationSupabase = {
+  var api = {
     configured: configured,
     getSession: readSession,
     signUp: signUp,
@@ -137,4 +137,7 @@
     rest: rest,
     rpc: rpc,
   };
+  window.WAYMAKERSSupabase = api;
+  // Keep CognationSupabase alias for login.js and other older call sites.
+  window.CognationSupabase = api;
 })();

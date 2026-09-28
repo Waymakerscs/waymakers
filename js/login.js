@@ -413,6 +413,7 @@
     SESSION_KEY: SESSION_KEY,
     apiBaseUrl: API_BASE,
   };
+  window.WAYMAKERSAuth = window.CognationAuth;
 
   document.addEventListener("click", function (ev) {
     var btn = ev.target && ev.target.closest && ev.target.closest("[data-cognation-logout]");
