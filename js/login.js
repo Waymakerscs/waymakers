@@ -223,7 +223,8 @@
 
   function finishWithProfileChoice(username, profiles, auth) {
     profiles = profiles || [];
-    if (profiles.length <= 1) {
+    /* Landing has no Tower profile picker — always enter with first/only profile. */
+    if (profiles.length <= 1 || !pickerEl) {
       return establishSession(username, profiles[0] || null, auth);
     }
     if (auth) {

@@ -1,6 +1,6 @@
 /**
  * Accessible tabs (WAI-ARIA APG pattern).
- * Labels/ids live in HTML — swap provisional names when final list arrives.
+ * Labels/ids live in HTML — WELL · PAGES · JOBS (empty panels).
  */
 (function () {
   "use strict";
@@ -27,15 +27,6 @@
         panels[i].hidden = !selected;
       });
       if (focusTab) tabs[index].focus();
-      var activeTab = tabs[index];
-      if (
-        activeTab &&
-        activeTab.id === "tab-well" &&
-        window.CognationWellAuth &&
-        typeof window.CognationWellAuth.onWellPanelShown === "function"
-      ) {
-        window.CognationWellAuth.onWellPanelShown();
-      }
     }
 
     tabs.forEach(function (tab, i) {
@@ -77,41 +68,5 @@
     activate(initial >= 0 ? initial : 0, false);
   }
 
-  function activateTowerFromHash() {
-    var hash = (location.hash || "").replace(/^#/, "");
-    if (!hash || hash.indexOf("tower-profile-") !== 0) return;
-    var towerTab = document.getElementById("tab-tower");
-    if (towerTab) towerTab.click();
-    /* Public profile deep-link — never open private My feed */
-    if (typeof window.CognationTowerApplySide === "function") {
-      window.CognationTowerApplySide("public");
-    } else {
-      document.querySelectorAll("[data-tower-app]").forEach(function (root) {
-        root.setAttribute("data-tower-side", "public");
-        var priv = root.querySelector("[data-tower-private-side]");
-        var pub = root.querySelector("[data-tower-public-side]");
-        if (priv) priv.hidden = true;
-        if (pub) pub.hidden = false;
-      });
-      try {
-        sessionStorage.setItem("cognation.tower.side", "public");
-      } catch (e) {}
-    }
-    window.setTimeout(function () {
-      var el = document.getElementById(hash) || document.querySelector('[data-author-slug="' + hash.replace(/^tower-profile-/, "") + '"]');
-      if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
-  }
-
-  function boot() {
-    document.querySelectorAll("[data-tabs]").forEach(initTabs);
-    activateTowerFromHash();
-    window.addEventListener("hashchange", activateTowerFromHash);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
-  }
+  document.querySelectorAll("[data-tabs]").forEach(initTabs);
 })();
