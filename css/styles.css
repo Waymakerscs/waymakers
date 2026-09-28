@@ -5704,23 +5704,6 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   border-radius: 10px;
 }
 
-.well-auth-demo-chrome {
-  margin: 0 0 0.85rem;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.82rem;
-  line-height: 1.45;
-  color: var(--well-warn, #6a3d12);
-  background: rgba(255, 248, 239, 0.95);
-  border: 1px solid #e8d4b8;
-  border-radius: 10px;
-}
-
-.well-auth-offline {
-  margin: 0.35rem 0 0;
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
 .home-shell {
   padding: 0.35rem 0 1rem;
 }
@@ -7589,8 +7572,6 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 .login-demo-hint[hidden],
 .well-auth-form[hidden],
-.well-auth-offline[hidden],
-.well-auth-demo-chrome[hidden],
 .well-auth-steps[hidden],
 .app-demo-banner[hidden] {
   display: none !important;
