@@ -477,14 +477,23 @@
               <div class="jobs-shell" data-jobs-shell>
                 <header class="jobs-intro">
                   <h3 class="jobs-title">JOBS</h3>
-                  <p class="jobs-dek">Applicant board · apply to openings from local companies</p>
+                  <p class="jobs-dek">Applicant board · local company openings plus Indeed / LinkedIn by location</p>
                   <p class="jobs-role-note">Companies manage care work in WELL; openings to apply for live here.</p>
                 </header>
 
                 <div class="jobs-filter-row">
                   <label class="jobs-sr-only" for="jobs-company">Filter by company</label>
                   <select id="jobs-company" class="jobs-company" data-jobs-company aria-label="Filter by company"></select>
-                  <button type="button" class="jobs-clear" data-jobs-clear hidden>Clear filter</button>
+                  <label class="jobs-sr-only" for="jobs-location">Location</label>
+                  <input type="search" id="jobs-location" class="jobs-location-input" data-jobs-location placeholder="City, region, or zip" autocomplete="address-level2" aria-label="Filter by location (city, region, or zip)" />
+                  <label class="jobs-sr-only" for="jobs-source">Source</label>
+                  <select id="jobs-source" class="jobs-source" data-jobs-source aria-label="Filter by source">
+                    <option value="">All sources</option>
+                    <option value="waymakers">Waymakers</option>
+                    <option value="indeed">Indeed</option>
+                    <option value="linkedin">LinkedIn</option>
+                  </select>
+                  <button type="button" class="jobs-clear" data-jobs-clear hidden>Clear filters</button>
                   <span class="jobs-count" data-jobs-count aria-live="polite"></span>
                 </div>
 
@@ -495,7 +504,7 @@
                   <p class="jobs-empty" data-jobs-empty hidden>No openings match.</p>
                 </div>
 
-                <p class="jobs-footer-note">Demo openings · keyed by company id shared with WELL &amp; PAGES</p>
+                <p class="jobs-footer-note">Waymakers openings keyed by company id (WELL &amp; PAGES) · Indeed / LinkedIn are labeled external search links until Publisher / partner API keys are configured</p>
               </div>
             </div>
           </div>
@@ -527,6 +536,7 @@
   <script src="js/well.js" defer></script>
   <script src="js/well-auth.js" defer></script>
   <script src="js/pages.js" defer></script>
+  <script src="js/jobs-adapters.js" defer></script>
   <script src="js/jobs.js" defer></script>
 </body>
 </html>

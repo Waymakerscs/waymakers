@@ -11,7 +11,7 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
 - Tabs: **WELL · PAGES · JOBS** (roles stay distinct)
   - **WELL** — company/provider UI (EHR demo chart, roster, doctor→patient messages, audit-only doctor notes)
   - **PAGES** — local directory of what’s available (`pages.js`)
-  - **JOBS** — applicant board (`jobs.js`); openings keyed by `companyId`
+  - **JOBS** — applicant board (`jobs.js` + `jobs-adapters.js`); openings keyed by `companyId`, plus Indeed / LinkedIn by location
 - Tower, Commune, badges, and widgets are **not** included
 
 ## Company identity (Well ↔ Jobs ↔ Pages)
@@ -25,6 +25,55 @@ Shared registry: `js/companies.js` (`WaymakersCompanies`).
 | PAGES | Public directory | listing `companyId` → **View jobs** opens JOBS filtered to that company |
 
 Deep link: `#jobs/<companyId>` (also `#jobs` for all). API: `WaymakersJobs.filterByCompany(id)`.
+
+## JOBS sources (v1)
+
+Filters on the JOBS tab:
+
+| Filter | Values |
+| --- | --- |
+| Company | Waymakers companies (`companyId`, same as WELL / PAGES) |
+| Location | City / region / zip (filters demo openings; passed into Indeed / LinkedIn search URLs) |
+| Source | `waymakers` \| `indeed` \| `linkedin` (or all) |
+
+### Behavior without API keys (default)
+
+- **Waymakers** — demo openings from local companies (companyId-linked).
+- **Indeed / LinkedIn** — clearly labeled **External** cards that deep-link to public search pages filtered by location (and company name when a company filter is active). Honest search links — **not** fake scraped listings.
+
+LinkedIn Jobs API is **partner-gated**. Indeed’s Publisher / Job Search API needs a publisher account. We do **not** HTML-scrape either site as the permanent solution (brittle + ToS risk).
+
+### Adding Indeed / LinkedIn keys later
+
+1. **Client (public IDs only)** — edit `js/cognation-config.js` → `WAYMAKERSConfig.jobs`:
+
+   ```js
+   jobs: {
+     defaultLocation: "Chicago, IL",
+     useApiProxy: true,          // try GET /api/jobs before deep-link fallback
+     apiProxyPath: "/api/jobs",
+     indeed: {
+       publisherId: "YOUR_PUBLIC_PUBLISHER_ID",
+       enabled: true,
+     },
+     linkedin: {
+       partnerConfigured: true,  // only after partnership + server secrets
+       enabled: true,
+     },
+   }
+   ```
+
+2. **Server secrets** — Cloudflare Pages → **waymakers** project → Settings → Environment variables (never commit these):
+
+   | Variable | Purpose |
+   | --- | --- |
+   | `INDEED_PUBLISHER_ID` | Indeed Publisher / affiliate id |
+   | `INDEED_API_KEY` | Optional secret if Indeed issues one |
+   | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` / `LINKEDIN_ACCESS_TOKEN` | LinkedIn partner Jobs API |
+
+3. **Wire the live HTTP calls** inside `functions/api/jobs.js` (`fetchIndeedListings` / `fetchLinkedInListings`) once your account’s official endpoints are confirmed. Until then the Function returns `mode: "deeplink"` and the UI keeps showing external search cards.
+
+4. Redeploy Pages so `functions/` ships with the site (see Deploy below). Details: `functions/README.md`.
 
 ## Auth (WAYMAKERS Supabase)
 

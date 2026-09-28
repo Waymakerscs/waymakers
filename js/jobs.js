@@ -5,6 +5,11 @@
  * and with PAGES directory listings). Filter via select, hash (#jobs/<companyId>),
  * or WaymakersJobs.filterByCompany(id) from Pages “View jobs” links.
  *
+ * Sources: waymakers (company demo jobs) | indeed | linkedin.
+ * Location filter (city / region / zip) applies to demo jobs and deep-link cards.
+ * Without Indeed/LinkedIn API keys, external sources are honest search deep-links
+ * (see jobs-adapters.js) — not fake scraped listings.
+ *
  * Not a company workspace (that’s WELL) and not a directory (that’s PAGES).
  */
 (function () {
@@ -14,6 +19,7 @@
     {
       id: "j-hpfm-ma",
       companyId: "hyde-park-family-medicine",
+      source: "waymakers",
       title: "Medical Assistant",
       type: "Full-time",
       location: "Hyde Park, Chicago",
@@ -23,6 +29,7 @@
     {
       id: "j-hpfm-front",
       companyId: "hyde-park-family-medicine",
+      source: "waymakers",
       title: "Front Desk Coordinator",
       type: "Full-time",
       location: "Hyde Park, Chicago",
@@ -32,6 +39,7 @@
     {
       id: "j-heart-rn",
       companyId: "heartland-internal-medicine",
+      source: "waymakers",
       title: "Registered Nurse — Ambulatory",
       type: "Full-time",
       location: "Streeterville, Chicago",
@@ -41,6 +49,7 @@
     {
       id: "j-heart-bill",
       companyId: "heartland-internal-medicine",
+      source: "waymakers",
       title: "Billing Specialist",
       type: "Part-time",
       location: "Streeterville / hybrid",
@@ -50,6 +59,7 @@
     {
       id: "j-bronze-hygienist",
       companyId: "bronzeville-family-dentistry",
+      source: "waymakers",
       title: "Dental Hygienist",
       type: "Full-time",
       location: "Bronzeville, Chicago",
@@ -59,6 +69,7 @@
     {
       id: "j-grill-cook",
       companyId: "milwaukee-ave-grill",
+      source: "waymakers",
       title: "Line Cook",
       type: "Full-time",
       location: "Wicker Park, Chicago",
@@ -68,6 +79,7 @@
     {
       id: "j-grill-server",
       companyId: "milwaukee-ave-grill",
+      source: "waymakers",
       title: "Server",
       type: "Part-time",
       location: "Wicker Park, Chicago",
@@ -77,6 +89,7 @@
     {
       id: "j-clark-barista",
       companyId: "clark-street-cafe",
+      source: "waymakers",
       title: "Barista",
       type: "Part-time",
       location: "Andersonville, Chicago",
@@ -86,7 +99,10 @@
   ];
 
   var activeFilter = "";
+  var activeLocation = "";
+  var activeSource = "";
   var shellRoot = null;
+  var loadToken = 0;
 
   function escapeHtml(str) {
     return String(str == null ? "" : str)
@@ -94,6 +110,15 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
+  }
+
+  function adapters() {
+    return window.WaymakersJobsAdapters || null;
+  }
+
+  function defaultLocation() {
+    var A = adapters();
+    return A && A.defaultLocation ? A.defaultLocation() : "Chicago, IL";
   }
 
   function companyName(id) {
@@ -116,11 +141,24 @@
     return out;
   }
 
-  function filterJobs(companyId) {
+  function locationMatches(jobLoc, filterLoc) {
+    var f = String(filterLoc || "").trim().toLowerCase();
+    if (!f) return true;
+    var hay = String(jobLoc || "").toLowerCase();
+    if (hay.indexOf(f) !== -1) return true;
+    /* loose: each whitespace token of the filter must appear somewhere */
+    var tokens = f.split(/[\s,]+/).filter(Boolean);
+    if (!tokens.length) return true;
+    return tokens.every(function (t) {
+      return hay.indexOf(t) !== -1;
+    });
+  }
+
+  function filterWaymakersJobs(companyId, location) {
     var id = (companyId || "").trim();
-    if (!id) return DEMO_JOBS.slice();
     return DEMO_JOBS.filter(function (j) {
-      return j.companyId === id;
+      if (id && j.companyId !== id) return false;
+      return locationMatches(j.location, location);
     });
   }
 
@@ -164,6 +202,18 @@
     select.value = selectedId || "";
   }
 
+  function sourceLabel(source) {
+    if (source === "indeed") return "Indeed";
+    if (source === "linkedin") return "LinkedIn";
+    return "Waymakers";
+  }
+
+  function displayCompany(job) {
+    if (job.companyName) return job.companyName;
+    if (job.companyId) return companyName(job.companyId);
+    return sourceLabel(job.source);
+  }
+
   function renderJobs(container, emptyEl, jobs, companyId) {
     container.innerHTML = "";
     if (!jobs.length) {
@@ -183,37 +233,70 @@
 
     jobs.forEach(function (job) {
       var li = document.createElement("li");
-      li.className = "jobs-card";
+      li.className =
+        "jobs-card" + (job.external ? " jobs-card--external" : "");
       li.setAttribute("data-job-id", job.id);
-      li.setAttribute("data-company-id", job.companyId);
+      if (job.companyId) li.setAttribute("data-company-id", job.companyId);
+      li.setAttribute("data-jobs-source", job.source || "waymakers");
+
+      var chips =
+        '<span class="jobs-chip">' +
+        escapeHtml(job.type || "") +
+        "</span>" +
+        '<span class="jobs-chip jobs-chip--source">' +
+        escapeHtml(sourceLabel(job.source)) +
+        "</span>";
+      if (job.external) {
+        chips +=
+          '<span class="jobs-chip jobs-chip--external">External</span>';
+      }
+
+      var actions;
+      if (job.external && job.url) {
+        actions =
+          '<div class="jobs-card-actions">' +
+          '<a class="jobs-apply-btn jobs-apply-btn--external" href="' +
+          escapeHtml(job.url) +
+          '" target="_blank" rel="noopener noreferrer">Open on ' +
+          escapeHtml(sourceLabel(job.source)) +
+          "</a>" +
+          "</div>";
+      } else {
+        actions =
+          '<div class="jobs-card-actions">' +
+          '<button type="button" class="jobs-apply-btn" data-jobs-apply="' +
+          escapeHtml(job.id) +
+          '">Apply</button>' +
+          "</div>";
+      }
+
+      var meta =
+        '<p class="jobs-card-meta">' +
+        '<span class="jobs-location">' +
+        escapeHtml(job.location || "") +
+        "</span>" +
+        (job.posted
+          ? '<span class="jobs-posted">Posted ' +
+            escapeHtml(job.posted) +
+            "</span>"
+          : "") +
+        "</p>";
+
       li.innerHTML =
         '<div class="jobs-card-row">' +
         '<strong class="jobs-card-title">' +
         escapeHtml(job.title) +
         "</strong>" +
-        '<span class="jobs-chip">' +
-        escapeHtml(job.type) +
-        "</span>" +
+        chips +
         "</div>" +
         '<p class="jobs-card-company">' +
-        escapeHtml(companyName(job.companyId)) +
+        escapeHtml(displayCompany(job)) +
         "</p>" +
         '<p class="jobs-card-blurb">' +
         escapeHtml(job.blurb) +
         "</p>" +
-        '<p class="jobs-card-meta">' +
-        '<span class="jobs-location">' +
-        escapeHtml(job.location) +
-        "</span>" +
-        '<span class="jobs-posted">Posted ' +
-        escapeHtml(job.posted) +
-        "</span>" +
-        "</p>" +
-        '<div class="jobs-card-actions">' +
-        '<button type="button" class="jobs-apply-btn" data-jobs-apply="' +
-        escapeHtml(job.id) +
-        '">Apply</button>' +
-        "</div>";
+        meta +
+        actions;
       ul.appendChild(li);
     });
 
@@ -225,8 +308,12 @@
         var job = DEMO_JOBS.filter(function (j) {
           return j.id === id;
         })[0];
-        var name = job ? job.title + " @ " + companyName(job.companyId) : "this role";
-        showApplyHint("Demo only — application for “" + name + "” is not live yet.");
+        var name = job
+          ? job.title + " @ " + companyName(job.companyId)
+          : "this role";
+        showApplyHint(
+          "Demo only — application for “" + name + "” is not live yet."
+        );
       });
     });
   }
@@ -247,40 +334,129 @@
     }, 4500);
   }
 
-  function updateFilterChrome(root, companyId) {
+  function updateFilterChrome(root, companyId, location, source, count) {
     var select = root.querySelector("[data-jobs-company]");
+    var locInput = root.querySelector("[data-jobs-location]");
+    var sourceSelect = root.querySelector("[data-jobs-source]");
     var clearBtn = root.querySelector("[data-jobs-clear]");
     var banner = root.querySelector("[data-jobs-filter-banner]");
     var countEl = root.querySelector("[data-jobs-count]");
+
     if (select && select.value !== (companyId || "")) {
       select.value = companyId || "";
     }
-    if (clearBtn) clearBtn.hidden = !companyId;
+    if (locInput && document.activeElement !== locInput) {
+      locInput.value = location || "";
+    }
+    if (sourceSelect && sourceSelect.value !== (source || "")) {
+      sourceSelect.value = source || "";
+    }
+    if (clearBtn) {
+      clearBtn.hidden = !(companyId || location || source);
+    }
     if (banner) {
-      if (companyId) {
+      var parts = [];
+      if (companyId) parts.push("company “" + companyName(companyId) + "”");
+      if (location) parts.push("near “" + location + "”");
+      if (source) parts.push("source " + sourceLabel(source));
+      if (parts.length) {
         banner.hidden = false;
-        banner.textContent = "Showing openings for " + companyName(companyId);
+        banner.textContent = "Showing openings for " + parts.join(" · ");
       } else {
         banner.hidden = true;
         banner.textContent = "";
       }
     }
     if (countEl) {
-      var n = filterJobs(companyId).length;
+      var n = typeof count === "number" ? count : 0;
       countEl.textContent = n === 1 ? "1 opening" : n + " openings";
     }
+  }
+
+  function gatherJobs(companyId, location, source) {
+    var src = (source || "").trim().toLowerCase();
+    var wantWm = !src || src === "waymakers";
+    var wantIndeed = !src || src === "indeed";
+    var wantLi = !src || src === "linkedin";
+    var A = adapters();
+    var loc = (location || "").trim() || defaultLocation();
+    var companyLabel = companyId ? companyName(companyId) : "";
+
+    var waymakers = wantWm
+      ? filterWaymakersJobs(companyId, location).map(function (j) {
+          return Object.assign({}, j, { source: j.source || "waymakers" });
+        })
+      : [];
+
+    var externalOpts = {
+      location: loc,
+      companyName: companyLabel,
+      query: companyLabel || "healthcare",
+    };
+
+    var indeedP = wantIndeed
+      ? A && A.searchIndeed
+        ? A.searchIndeed(externalOpts)
+        : Promise.resolve([])
+      : Promise.resolve([]);
+    var linkedinP = wantLi
+      ? A && A.searchLinkedIn
+        ? A.searchLinkedIn(externalOpts)
+        : Promise.resolve([])
+      : Promise.resolve([]);
+
+    return Promise.all([indeedP, linkedinP]).then(function (pair) {
+      var indeed = pair[0] || [];
+      var linkedin = pair[1] || [];
+      /* When a company filter is active, still show external search cards
+         (keyword = company) after Waymakers openings — honest, not fake. */
+      return waymakers.concat(indeed).concat(linkedin);
+    });
   }
 
   function applyFilter(companyId, opts) {
     opts = opts || {};
     activeFilter = (companyId || "").trim();
+    if (typeof opts.location === "string") activeLocation = opts.location.trim();
+    if (typeof opts.source === "string") {
+      activeSource = opts.source.trim().toLowerCase();
+    }
     if (!shellRoot) return;
-    updateFilterChrome(shellRoot, activeFilter);
+
+    var token = ++loadToken;
+    updateFilterChrome(
+      shellRoot,
+      activeFilter,
+      activeLocation,
+      activeSource,
+      null
+    );
+
     var results = shellRoot.querySelector("[data-jobs-results]");
     var empty = shellRoot.querySelector("[data-jobs-empty]");
-    if (results && empty) {
-      renderJobs(results, empty, filterJobs(activeFilter), activeFilter);
+    if (results) {
+      results.innerHTML =
+        '<p class="jobs-loading" role="status">Loading openings…</p>';
+      results.hidden = false;
     }
+    if (empty) empty.hidden = true;
+
+    gatherJobs(activeFilter, activeLocation, activeSource).then(function (
+      jobs
+    ) {
+      if (token !== loadToken || !shellRoot) return;
+      updateFilterChrome(
+        shellRoot,
+        activeFilter,
+        activeLocation,
+        activeSource,
+        jobs.length
+      );
+      if (results && empty) {
+        renderJobs(results, empty, jobs, activeFilter);
+      }
+    });
+
     if (opts.updateHash !== false) setHashForFilter(activeFilter);
   }
 
@@ -294,32 +470,99 @@
    */
   function filterByCompany(companyId) {
     switchToJobsTab();
-    applyFilter(companyId, { updateHash: true });
+    applyFilter(companyId, {
+      updateHash: true,
+      location: activeLocation,
+      source: activeSource,
+    });
   }
 
   function clearFilter() {
-    applyFilter("", { updateHash: true });
+    activeLocation = "";
+    activeSource = "";
+    if (shellRoot) {
+      var locInput = shellRoot.querySelector("[data-jobs-location]");
+      var sourceSelect = shellRoot.querySelector("[data-jobs-source]");
+      if (locInput) locInput.value = "";
+      if (sourceSelect) sourceSelect.value = "";
+    }
+    applyFilter("", { updateHash: true, location: "", source: "" });
+  }
+
+  function readChromeFilters(root) {
+    var locInput = root.querySelector("[data-jobs-location]");
+    var sourceSelect = root.querySelector("[data-jobs-source]");
+    return {
+      location: locInput ? locInput.value.trim() : activeLocation,
+      source: sourceSelect ? sourceSelect.value.trim() : activeSource,
+    };
   }
 
   function renderShell(root) {
     shellRoot = root;
     var select = root.querySelector("[data-jobs-company]");
     var clearBtn = root.querySelector("[data-jobs-clear]");
+    var locInput = root.querySelector("[data-jobs-location]");
+    var sourceSelect = root.querySelector("[data-jobs-source]");
     if (!select) return;
 
     var fromHash = parseHashCompany();
     buildCompanySelect(select, fromHash || activeFilter);
 
+    if (locInput && !locInput.value && !activeLocation) {
+      locInput.placeholder = "City, region, or zip (e.g. " + defaultLocation() + ")";
+    }
+    if (locInput && activeLocation) locInput.value = activeLocation;
+    if (sourceSelect && activeSource) sourceSelect.value = activeSource;
+
     select.addEventListener("change", function () {
-      applyFilter(select.value, { updateHash: true });
+      var chrome = readChromeFilters(root);
+      applyFilter(select.value, {
+        updateHash: true,
+        location: chrome.location,
+        source: chrome.source,
+      });
     });
+
+    if (locInput) {
+      var locTimer = null;
+      function onLocChange() {
+        window.clearTimeout(locTimer);
+        locTimer = window.setTimeout(function () {
+          var chrome = readChromeFilters(root);
+          applyFilter(activeFilter, {
+            updateHash: false,
+            location: chrome.location,
+            source: chrome.source,
+          });
+        }, 280);
+      }
+      locInput.addEventListener("input", onLocChange);
+      locInput.addEventListener("change", onLocChange);
+    }
+
+    if (sourceSelect) {
+      sourceSelect.addEventListener("change", function () {
+        var chrome = readChromeFilters(root);
+        applyFilter(activeFilter, {
+          updateHash: false,
+          location: chrome.location,
+          source: chrome.source,
+        });
+      });
+    }
+
     if (clearBtn) {
       clearBtn.addEventListener("click", function () {
         clearFilter();
       });
     }
 
-    applyFilter(fromHash || activeFilter, { updateHash: !!fromHash });
+    applyFilter(fromHash || activeFilter, {
+      updateHash: !!fromHash,
+      location: activeLocation,
+      source: activeSource,
+    });
   }
 
   function onHashChange() {
@@ -327,7 +570,11 @@
     if (h.indexOf("jobs") !== 0) return;
     var id = parseHashCompany();
     switchToJobsTab();
-    applyFilter(id, { updateHash: false });
+    applyFilter(id, {
+      updateHash: false,
+      location: activeLocation,
+      source: activeSource,
+    });
   }
 
   function boot() {
@@ -344,6 +591,12 @@
     clearFilter: clearFilter,
     getFilter: function () {
       return activeFilter;
+    },
+    getLocation: function () {
+      return activeLocation;
+    },
+    getSource: function () {
+      return activeSource;
     },
     list: function () {
       return DEMO_JOBS.slice();
