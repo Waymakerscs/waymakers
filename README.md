@@ -9,7 +9,7 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
 - Header masthead: **WAYMAKERS** wordmark (glowing black on silvery holo) + tagline “A wellness concierge”
 - Signup / sign-in (WAYMAKERS Supabase)
 - Tabs: **WELL · PAGES · JOBS** (roles stay distinct)
-  - **WELL** — company/provider UI (EHR demo chart, roster, doctor→patient messages, audit-only doctor notes)
+  - **WELL** — company/provider UI (EHR demo chart, roster, doctor→patient messages, audit-only doctor notes, Apple Health consent + export upload)
   - **PAGES** — local directory of what’s available (`pages.js`)
   - **JOBS** — applicant board (`jobs.js` + `jobs-adapters.js`); openings keyed by `companyId`, plus Indeed / LinkedIn by location
 - Tower, Commune, badges, and widgets are **not** included
@@ -74,6 +74,17 @@ LinkedIn Jobs API is **partner-gated**. Indeed’s Publisher / Job Search API ne
 3. **Wire the live HTTP calls** inside `functions/api/jobs.js` (`fetchIndeedListings` / `fetchLinkedInListings`) once your account’s official endpoints are confirmed. Until then the Function returns `mode: "deeplink"` and the UI keeps showing external search cards.
 
 4. Redeploy Pages so `functions/` ships with the site (see Deploy below). Details: `functions/README.md`.
+
+## WELL · Apple Health (v1)
+
+Patient portal tab **Apple Health**:
+
+- Clear permission prompt (categories shared with the care team)
+- Grant / revoke consent (append-only audit)
+- Upload Apple Health `export.zip` or `.xml` (bytes in IndexedDB; metadata + audit in portal store)
+- Honest UI: live HealthKit sync needs a native iOS app later — this is manual export only
+
+Jobs / Pages / Cognation are untouched.
 
 ## Auth (WAYMAKERS Supabase)
 

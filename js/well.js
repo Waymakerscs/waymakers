@@ -5,9 +5,13 @@
  *            | Provider (chart view; compose doctor messages + append-only notes)
  * sessionStorage: cognation.well.side = patient|provider
  * localStorage:   cognation.well.portal.v1  (demo chart + prefs — stays in this browser)
+ * IndexedDB:      cognation.well.applehealth.v1 (Apple Health export file bytes)
  *
  * Doctor messages: provider → patient (compose on Provider portal).
  * Doctor notes: stored in the patient portal data; append-only / audit log — never deleted.
+ * Apple Health (v1): patient consent grant/revoke + manual export.zip/XML upload;
+ *   consent + upload events are append-only in appleHealth.audit. Live HealthKit sync
+ *   needs a native iOS app later — web UI stays honest about that.
  *
  * Demo only — not a real EHR. Do not claim HIPAA compliance.
  */
@@ -26,10 +30,24 @@
     { id: "diagnoses", label: "Diagnoses" },
     { id: "progress", label: "Progress note" },
     { id: "plan", label: "Care plan" },
+    { id: "applehealth", label: "Apple Health" },
   ];
 
+  var APPLE_HEALTH_SCOPES = [
+    "Activity & workouts",
+    "Heart rate & vitals trends",
+    "Sleep",
+    "Steps / mobility",
+    "Nutrition (if present in your export)",
+    "Clinical records embedded in the export (if present)",
+  ];
+
+  var APPLE_HEALTH_DB = "cognation.well.applehealth.v1";
+  var APPLE_HEALTH_STORE = "exports";
+  var APPLE_HEALTH_MAX_BYTES = 25 * 1024 * 1024; /* 25 MB demo cap */
+
   var DEMO_SEED = {
-    version: 4,
+    version: 5,
     patient: {
       name: "Alexa J. Thomas",
       dob: "1990-04-12",
@@ -179,6 +197,19 @@
         detail: "Doctor note created (append-only)",
       },
     ],
+    /* Apple Health share (patient portal). Consent + uploads audited append-only. */
+    appleHealth: {
+      consent: {
+        granted: false,
+        grantedAt: "",
+        revokedAt: "",
+        version: 1,
+        scopes: APPLE_HEALTH_SCOPES.slice(),
+      },
+      /* Upload metadata only here; file bytes live in IndexedDB keyed by id. Append-only. */
+      uploads: [],
+      audit: [],
+    },
     prefs: {
       lastSection: "intake",
       selectedRosterId: "p1",
@@ -567,8 +598,9 @@
         base.chart.diagnoses = deepClone(DEMO_SEED.chart.diagnoses);
       }
     }
-    base.version = Math.max(4, Number(raw.version) || 0, Number(base.version) || 0);
-    return ensureCalPrefs(base);
+    base.appleHealth = mergeAppleHealthAppendOnly(base.appleHealth, raw.appleHealth);
+    base.version = Math.max(5, Number(raw.version) || 0, Number(base.version) || 0);
+    return ensureCalPrefs(ensureAppleHealth(base));
   }
 
   var PortalStore = {
@@ -673,6 +705,10 @@
           return String(a.at || "").localeCompare(String(b.at || ""));
         });
         data.doctorNotesAudit = auditOut;
+        /* Apple Health: consent may change; uploads + audit are append-only */
+        data.appleHealth = mergeAppleHealthAppendOnly(prev.appleHealth, data.appleHealth);
+        ensureAppleHealth(data);
+        data.version = Math.max(5, Number(data.version) || 0);
         localStorage.setItem(PORTAL_KEY, JSON.stringify(data));
         return true;
       } catch (e) {
@@ -1104,7 +1140,158 @@
     );
   }
 
+  function renderAppleHealthAuditHtml(audit) {
+    var list = (audit || []).slice().sort(function (a, b) {
+      return String(b.at || "").localeCompare(String(a.at || ""));
+    });
+    if (!list.length) {
+      return '<p class="well-muted well-tiny">No Apple Health audit events yet.</p>';
+    }
+    return (
+      '<details class="well-audit-log well-ah-audit" open>' +
+      "<summary>Apple Health audit log (" +
+      list.length +
+      ") · append-only</summary>" +
+      '<ul class="well-list well-list--compact well-audit-list">' +
+      list
+        .map(function (a) {
+          return (
+            "<li><strong>" +
+            escapeHtml(a.action || "") +
+            "</strong> · " +
+            escapeHtml(a.at || "") +
+            '<br><span class="well-muted">' +
+            escapeHtml(a.by || "") +
+            (a.uploadId ? " · file " + escapeHtml(a.uploadId) : "") +
+            (a.detail ? " — " + escapeHtml(a.detail) : "") +
+            "</span></li>"
+          );
+        })
+        .join("") +
+      "</ul></details>"
+    );
+  }
+
+  function renderAppleHealthUploadsHtml(uploads, editable) {
+    var list = uploads || [];
+    if (!list.length) {
+      return '<p class="well-muted">No Apple Health exports uploaded yet.</p>';
+    }
+    return (
+      '<ul class="well-list well-ah-uploads">' +
+      list
+        .map(function (u) {
+          return (
+            "<li>" +
+            "<strong>" +
+            escapeHtml(u.fileName || "export") +
+            "</strong>" +
+            ' <span class="well-audit-badge">Stored</span>' +
+            "<br><span class=\"well-muted\">" +
+            escapeHtml(u.uploadedAt || "") +
+            " · " +
+            escapeHtml(formatBytes(u.sizeBytes)) +
+            " · " +
+            escapeHtml(u.kind || u.mimeType || "file") +
+            "</span>" +
+            ' <button type="button" class="btn btn-secondary well-mini-btn" data-well-ah-download="' +
+            escapeHtml(u.id) +
+            '">Download copy</button>' +
+            "</li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    );
+  }
+
+  function renderAppleHealthSectionHtml(data, editable) {
+    ensureAppleHealth(data);
+    var ah = data.appleHealth;
+    var c = ah.consent;
+    var granted = !!c.granted;
+    var scopesHtml =
+      "<ul class=\"well-ah-scopes\">" +
+      (c.scopes || APPLE_HEALTH_SCOPES)
+        .map(function (s) {
+          return "<li>" + escapeHtml(s) + "</li>";
+        })
+        .join("") +
+      "</ul>";
+
+    var statusHtml = granted
+      ? '<p class="well-ah-status well-ah-status--granted" role="status"><strong>Permission granted</strong>' +
+        (c.grantedAt ? " · " + escapeHtml(c.grantedAt) : "") +
+        ". Your care team may use uploaded Apple Health export data listed below.</p>"
+      : '<p class="well-ah-status well-ah-status--revoked" role="status"><strong>Permission not granted</strong>' +
+        (c.revokedAt ? " · last revoked " + escapeHtml(c.revokedAt) : "") +
+        ". Upload is locked until you grant permission.</p>";
+
+    var consentActions = "";
+    if (editable) {
+      consentActions = granted
+        ? '<button type="button" class="btn btn-secondary" data-well-ah-revoke>Revoke permission</button>'
+        : '<button type="button" class="btn btn-primary" data-well-ah-grant>Grant permission</button>';
+    } else {
+      consentActions =
+        '<p class="well-muted well-tiny">Provider view · consent is managed on the Patient portal.</p>';
+    }
+
+    var uploadBlock = "";
+    if (editable) {
+      uploadBlock =
+        '<div class="well-ah-upload' +
+        (granted ? "" : " is-disabled") +
+        '">' +
+        "<h4>Upload Apple Health export</h4>" +
+        '<p class="well-muted well-tiny">On iPhone: Health → profile → Export All Health Data → share the <code>export.zip</code> (contains <code>export.xml</code>). You may also upload a bare <code>.xml</code>.</p>' +
+        '<label class="well-field" for="well-ah-file">' +
+        '<span class="well-sr-only">Choose Apple Health export file</span>' +
+        '<input type="file" id="well-ah-file" data-well-ah-file accept=".zip,.xml,application/zip,text/xml,application/xml"' +
+        (granted ? "" : " disabled") +
+        ">" +
+        "</label>" +
+        '<div class="well-compose-actions">' +
+        '<button type="button" class="btn btn-primary" data-well-ah-upload' +
+        (granted ? "" : " disabled") +
+        ">Store export in portal</button>" +
+        '<span class="commune-status well-status" data-well-ah-status hidden role="status" aria-live="polite"></span>' +
+        "</div>" +
+        '<p class="well-muted well-tiny">Max ' +
+        formatBytes(APPLE_HEALTH_MAX_BYTES) +
+        " · stored in this browser (IndexedDB) with an append-only audit entry.</p>" +
+        "</div>";
+    }
+
+    return (
+      '<div class="well-doc-form well-ah-panel" data-well-doc="applehealth">' +
+      '<p class="well-doc-lead">Share Apple Health data with your WELL care team (v1 · manual export).</p>' +
+      '<div class="well-ah-honest" role="note">' +
+      "<strong>Honest limit:</strong> this web portal does <em>not</em> do live HealthKit sync. " +
+      "Continuous / background HealthKit access needs a native iOS app later. " +
+      "Today you can grant permission and upload an Apple Health export file." +
+      "</div>" +
+      '<section class="well-ah-consent" aria-labelledby="well-ah-consent-title">' +
+      '<h3 id="well-ah-consent-title">Permission to share</h3>' +
+      "<p>If you grant permission, WELL may store and show your care team the categories below from any export you upload:</p>" +
+      scopesHtml +
+      "<p class=\"well-muted well-tiny\">You can revoke anytime. Revoking stops new uploads; prior uploads and the audit log stay (append-only).</p>" +
+      statusHtml +
+      '<div class="well-compose-actions">' +
+      consentActions +
+      "</div></section>" +
+      uploadBlock +
+      '<section class="well-ah-stored" aria-labelledby="well-ah-stored-title">' +
+      '<h3 id="well-ah-stored-title">Stored exports</h3>' +
+      renderAppleHealthUploadsHtml(ah.uploads, editable) +
+      "</section>" +
+      renderAppleHealthAuditHtml(ah.audit) +
+      "</div>"
+    );
+  }
+
   function renderSectionBody(sectionId, data, editable, idPrefix) {
+
     var c = data.chart;
     var p = idPrefix || (editable ? "pt" : "pv");
     var ro = !editable;
@@ -1224,11 +1411,18 @@
       );
     }
 
+    if (sectionId === "applehealth") {
+      return renderAppleHealthSectionHtml(data, editable);
+    }
+
     return "<p>Unknown section.</p>";
   }
 
   function collectFormFields(container, sectionId) {
     var data = PortalStore.get();
+    if (sectionId === "applehealth") {
+      return ensureAppleHealth(data);
+    }
     var form = container.querySelector('[data-well-doc="' + sectionId + '"]');
     if (!form) return data;
 
@@ -1298,7 +1492,174 @@
     el.classList.toggle("is-error", !!isError);
   }
 
+  function setAhStatus(host, msg, isError) {
+    var el = host.querySelector("[data-well-ah-status]");
+    if (!el) return;
+    el.hidden = !msg;
+    el.textContent = msg || "";
+    el.classList.toggle("is-error", !!isError);
+  }
+
+  function bindAppleHealthEditors(root, host) {
+    var grantBtn = host.querySelector("[data-well-ah-grant]");
+    var revokeBtn = host.querySelector("[data-well-ah-revoke]");
+    var uploadBtn = host.querySelector("[data-well-ah-upload]");
+    var fileInput = host.querySelector("[data-well-ah-file]");
+
+    if (grantBtn) {
+      grantBtn.addEventListener("click", function () {
+        var data = ensureAppleHealth(PortalStore.get());
+        data.appleHealth.consent.granted = true;
+        data.appleHealth.consent.grantedAt = nowStamp();
+        data.appleHealth.consent.revokedAt = "";
+        data.appleHealth.consent.scopes = APPLE_HEALTH_SCOPES.slice();
+        data.appleHealth.consent.version = 1;
+        appendAppleHealthAudit(
+          data,
+          "consent_granted",
+          "Patient granted permission to share Apple Health export categories with WELL"
+        );
+        data.prefs.lastSection = "applehealth";
+        PortalStore.save(data);
+        renderPatient(root, PortalStore.get(), "applehealth");
+        setStatus(root, "Apple Health permission granted · logged in audit trail.", false);
+      });
+    }
+
+    if (revokeBtn) {
+      revokeBtn.addEventListener("click", function () {
+        var data = ensureAppleHealth(PortalStore.get());
+        data.appleHealth.consent.granted = false;
+        data.appleHealth.consent.revokedAt = nowStamp();
+        appendAppleHealthAudit(
+          data,
+          "consent_revoked",
+          "Patient revoked Apple Health share permission (prior uploads + audit retained)"
+        );
+        data.prefs.lastSection = "applehealth";
+        PortalStore.save(data);
+        renderPatient(root, PortalStore.get(), "applehealth");
+        setStatus(root, "Apple Health permission revoked · prior uploads kept in audit trail.", false);
+      });
+    }
+
+    if (uploadBtn && fileInput) {
+      uploadBtn.addEventListener("click", function () {
+        var data = ensureAppleHealth(PortalStore.get());
+        if (!data.appleHealth.consent.granted) {
+          setAhStatus(host, "Grant permission before uploading.", true);
+          return;
+        }
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) {
+          setAhStatus(host, "Choose an export.zip or .xml file first.", true);
+          return;
+        }
+        if (!isAllowedAppleHealthFile(file)) {
+          setAhStatus(host, "Only Apple Health export.zip or .xml files are accepted.", true);
+          return;
+        }
+        if (file.size > APPLE_HEALTH_MAX_BYTES) {
+          setAhStatus(
+            host,
+            "File too large (max " + formatBytes(APPLE_HEALTH_MAX_BYTES) + ").",
+            true
+          );
+          return;
+        }
+        uploadBtn.disabled = true;
+        setAhStatus(host, "Storing export…", false);
+        var id = newId("ahu");
+        var nameLower = String(file.name).toLowerCase();
+        var kind = nameLower.endsWith(".xml")
+          ? "xml"
+          : nameLower.endsWith(".zip")
+            ? "zip"
+            : file.type || "file";
+        var meta = {
+          id: id,
+          fileName: file.name,
+          mimeType: file.type || "",
+          kind: kind,
+          sizeBytes: file.size,
+          uploadedAt: nowStamp(),
+          immutable: true,
+        };
+        ahPutFile(id, file, meta)
+          .then(function () {
+            var cur = ensureAppleHealth(PortalStore.get());
+            if (!cur.appleHealth.consent.granted) {
+              setAhStatus(host, "Permission was revoked before store finished.", true);
+              uploadBtn.disabled = false;
+              return;
+            }
+            cur.appleHealth.uploads.push(meta);
+            appendAppleHealthAudit(
+              cur,
+              "upload_stored",
+              "Stored Apple Health export “" +
+                file.name +
+                "” (" +
+                formatBytes(file.size) +
+                ")",
+              { uploadId: id }
+            );
+            cur.prefs.lastSection = "applehealth";
+            if (!PortalStore.save(cur)) {
+              setAhStatus(host, "Could not save metadata (storage blocked).", true);
+              uploadBtn.disabled = false;
+              return;
+            }
+            renderPatient(root, PortalStore.get(), "applehealth");
+            setStatus(
+              root,
+              "Apple Health export stored with audit trail · " + file.name,
+              false
+            );
+          })
+          .catch(function (err) {
+            setAhStatus(
+              host,
+              "Could not store file: " + ((err && err.message) || "unknown error"),
+              true
+            );
+            uploadBtn.disabled = false;
+          });
+      });
+    }
+
+    host.querySelectorAll("[data-well-ah-download]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = btn.getAttribute("data-well-ah-download");
+        if (!id) return;
+        ahGetFile(id)
+          .then(function (rec) {
+            if (!rec || !rec.blob) {
+              setStatus(root, "Stored file not found in this browser.", true);
+              return;
+            }
+            var url = URL.createObjectURL(rec.blob);
+            var a = document.createElement("a");
+            a.href = url;
+            a.download =
+              (rec.meta && rec.meta.fileName) ||
+              "apple-health-export.bin";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () {
+              URL.revokeObjectURL(url);
+            }, 2000);
+          })
+          .catch(function () {
+            setStatus(root, "Could not read stored export from IndexedDB.", true);
+          });
+      });
+    });
+  }
+
   function bindPatientEditors(root, host, sectionId) {
+
     var saveBtn = host.querySelector("[data-well-save]");
     var resetBtn = host.querySelector("[data-well-reset-section]");
 
@@ -1415,6 +1776,205 @@
       Date.now().toString(36) +
       Math.floor(Math.random() * 1e4).toString(36)
     );
+  }
+
+  function defaultAppleHealth() {
+    return {
+      consent: {
+        granted: false,
+        grantedAt: "",
+        revokedAt: "",
+        version: 1,
+        scopes: APPLE_HEALTH_SCOPES.slice(),
+      },
+      uploads: [],
+      audit: [],
+    };
+  }
+
+  function ensureAppleHealth(data) {
+    data = data || {};
+    var seed = defaultAppleHealth();
+    if (!data.appleHealth || typeof data.appleHealth !== "object") {
+      data.appleHealth = seed;
+      return data;
+    }
+    var ah = data.appleHealth;
+    if (!ah.consent || typeof ah.consent !== "object") ah.consent = seed.consent;
+    if (!Array.isArray(ah.consent.scopes) || !ah.consent.scopes.length) {
+      ah.consent.scopes = APPLE_HEALTH_SCOPES.slice();
+    }
+    if (typeof ah.consent.granted !== "boolean") ah.consent.granted = !!ah.consent.granted;
+    if (ah.consent.grantedAt == null) ah.consent.grantedAt = "";
+    if (ah.consent.revokedAt == null) ah.consent.revokedAt = "";
+    if (!ah.consent.version) ah.consent.version = 1;
+    if (!Array.isArray(ah.uploads)) ah.uploads = [];
+    if (!Array.isArray(ah.audit)) ah.audit = [];
+    data.appleHealth = ah;
+    return data;
+  }
+
+  function mergeAppleHealthAppendOnly(prevAh, nextAh) {
+    var base = defaultAppleHealth();
+    prevAh = prevAh && typeof prevAh === "object" ? prevAh : null;
+    nextAh = nextAh && typeof nextAh === "object" ? nextAh : null;
+    var consentSrc = (nextAh && nextAh.consent) || (prevAh && prevAh.consent) || base.consent;
+    base.consent = {
+      granted: !!consentSrc.granted,
+      grantedAt: consentSrc.grantedAt || "",
+      revokedAt: consentSrc.revokedAt || "",
+      version: Number(consentSrc.version) || 1,
+      scopes:
+        Array.isArray(consentSrc.scopes) && consentSrc.scopes.length
+          ? consentSrc.scopes.slice()
+          : APPLE_HEALTH_SCOPES.slice(),
+    };
+    var upById = {};
+    var upOut = [];
+    function takeUp(list) {
+      (list || []).forEach(function (u) {
+        if (!u || !u.id) return;
+        if (upById[u.id]) return;
+        var row = Object.assign({}, u);
+        row.immutable = true;
+        upById[u.id] = row;
+        upOut.push(row);
+      });
+    }
+    takeUp(prevAh && prevAh.uploads);
+    takeUp(nextAh && nextAh.uploads);
+    takeUp(base.uploads);
+    upOut.sort(function (a, b) {
+      return String(a.uploadedAt || "").localeCompare(String(b.uploadedAt || ""));
+    });
+    base.uploads = upOut;
+    var audById = {};
+    var audOut = [];
+    function takeAud(list) {
+      (list || []).forEach(function (a) {
+        if (!a) return;
+        var id =
+          a.id ||
+          String(a.at || "") +
+            "|" +
+            String(a.action || "") +
+            "|" +
+            String(a.uploadId || "") +
+            "|" +
+            String(a.detail || "");
+        if (audById[id]) return;
+        var row = Object.assign({ id: id }, a);
+        audById[id] = row;
+        audOut.push(row);
+      });
+    }
+    takeAud(prevAh && prevAh.audit);
+    takeAud(nextAh && nextAh.audit);
+    audOut.sort(function (a, b) {
+      return String(a.at || "").localeCompare(String(b.at || ""));
+    });
+    base.audit = audOut;
+    return base;
+  }
+
+  function appendAppleHealthAudit(data, action, detail, extra) {
+    ensureAppleHealth(data);
+    var row = Object.assign(
+      {
+        id: newId("aha"),
+        at: nowStamp(),
+        action: action,
+        by: "patient",
+        detail: detail || "",
+        uploadId: "",
+      },
+      extra || {}
+    );
+    data.appleHealth.audit.push(row);
+    return row;
+  }
+
+  function ahOpenDb() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) {
+        reject(new Error("IndexedDB unavailable in this browser"));
+        return;
+      }
+      var req = indexedDB.open(APPLE_HEALTH_DB, 1);
+      req.onupgradeneeded = function () {
+        var db = req.result;
+        if (!db.objectStoreNames.contains(APPLE_HEALTH_STORE)) {
+          db.createObjectStore(APPLE_HEALTH_STORE);
+        }
+      };
+      req.onsuccess = function () {
+        resolve(req.result);
+      };
+      req.onerror = function () {
+        reject(req.error || new Error("IndexedDB open failed"));
+      };
+    });
+  }
+
+  function ahPutFile(id, blob, meta) {
+    return ahOpenDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(APPLE_HEALTH_STORE, "readwrite");
+        tx.oncomplete = function () {
+          resolve(true);
+        };
+        tx.onerror = function () {
+          reject(tx.error || new Error("IndexedDB write failed"));
+        };
+        tx.objectStore(APPLE_HEALTH_STORE).put(
+          {
+            id: id,
+            blob: blob,
+            meta: meta || {},
+            storedAt: nowStamp(),
+          },
+          id
+        );
+      });
+    });
+  }
+
+  function ahGetFile(id) {
+    return ahOpenDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction(APPLE_HEALTH_STORE, "readonly");
+        var req = tx.objectStore(APPLE_HEALTH_STORE).get(id);
+        req.onsuccess = function () {
+          resolve(req.result || null);
+        };
+        req.onerror = function () {
+          reject(req.error || new Error("IndexedDB read failed"));
+        };
+      });
+    });
+  }
+
+  function formatBytes(n) {
+    n = Number(n) || 0;
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function isAllowedAppleHealthFile(file) {
+    if (!file || !file.name) return false;
+    var name = String(file.name).toLowerCase();
+    var type = String(file.type || "").toLowerCase();
+    if (name.endsWith(".zip") || name.endsWith(".xml")) return true;
+    if (
+      type === "application/zip" ||
+      type === "application/x-zip-compressed" ||
+      type === "text/xml" ||
+      type === "application/xml"
+    ) {
+      return true;
+    }
+    return false;
   }
 
   function normalizeMessage(m) {
@@ -1623,8 +2183,10 @@
       '">' +
       renderSectionBody(sectionId, data, true, "pt") +
       '<div class="well-doc-actions">' +
-      '<button type="button" class="btn btn-primary" data-well-save>Save to browser</button>' +
-      '<button type="button" class="btn btn-secondary" data-well-reset-section>Reset section</button>' +
+      (sectionId === "applehealth"
+        ? ""
+        : '<button type="button" class="btn btn-primary" data-well-save>Save to browser</button>' +
+          '<button type="button" class="btn btn-secondary" data-well-reset-section>Reset section</button>') +
       '<button type="button" class="btn btn-secondary" data-well-reset-all>Reset entire chart</button>' +
       '<span class="commune-status well-status" data-well-status hidden role="status" aria-live="polite"></span>' +
       "</div></div></div>" +
@@ -1649,6 +2211,9 @@
     });
 
     bindPatientEditors(root, host, sectionId);
+    if (sectionId === "applehealth") {
+      bindAppleHealthEditors(root, host);
+    }
 
     var resetAll = host.querySelector("[data-well-reset-all]");
     if (resetAll) {
@@ -1656,7 +2221,7 @@
         var prev = PortalStore.get();
         var fresh = deepClone(DEMO_SEED);
         fresh.prefs.lastSection = sectionId;
-        /* Doctor notes + audit are append-only — never wiped by chart reset */
+        /* Doctor notes + Apple Health are append-only — never wiped by chart reset */
         fresh.doctorNotes = deepClone(prev.doctorNotes || DEMO_SEED.doctorNotes);
         fresh.doctorNotesAudit = deepClone(
           prev.doctorNotesAudit || DEMO_SEED.doctorNotesAudit || []
@@ -1669,9 +2234,22 @@
           by: "patient",
           detail: "Chart fields reset; doctor notes preserved (append-only)",
         });
+        fresh.appleHealth = mergeAppleHealthAppendOnly(
+          prev.appleHealth,
+          prev.appleHealth
+        );
+        appendAppleHealthAudit(
+          fresh,
+          "chart_reset",
+          "Chart fields reset; Apple Health consent/uploads/audit preserved (append-only)"
+        );
         PortalStore.save(fresh);
         renderPatient(root, PortalStore.get(), sectionId);
-        setStatus(root, "Chart reset · doctor notes preserved (audit-only).", false);
+        setStatus(
+          root,
+          "Chart reset · doctor notes + Apple Health preserved (audit-only).",
+          false
+        );
       });
     }
 
@@ -1829,6 +2407,10 @@
         renderProvider(root, cur);
       });
     });
+
+    if (isPrimary && sectionId === "applehealth") {
+      bindAppleHealthEditors(root, host);
+    }
 
     host.querySelectorAll("[data-well-roster]").forEach(function (btn) {
       btn.addEventListener("click", function () {

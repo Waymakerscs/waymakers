@@ -11188,3 +11188,78 @@ body:has(.waymakers-masthead) .site-header {
   max-height: 9rem;
   overflow: auto;
 }
+
+
+/* Apple Health consent + upload (Well patient portal v1) */
+.well-ah-panel {
+  display: grid;
+  gap: 1rem;
+}
+.well-ah-honest {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(138, 90, 42, 0.45);
+  background: rgba(255, 244, 230, 0.9);
+  color: #5a3a12;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+.well-ah-consent,
+.well-ah-upload,
+.well-ah-stored {
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--well-line, #c5d4dc);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+}
+.well-ah-consent h3,
+.well-ah-upload h4,
+.well-ah-stored h3 {
+  margin: 0 0 0.45rem;
+  font-size: 1rem;
+  color: var(--well-teal, #2a7a8a);
+}
+.well-ah-scopes {
+  margin: 0.35rem 0 0.65rem;
+  padding-left: 1.2rem;
+  color: var(--well-ink, #1e2a32);
+}
+.well-ah-scopes li {
+  margin: 0.15rem 0;
+}
+.well-ah-status {
+  margin: 0.55rem 0;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+.well-ah-status--granted {
+  background: rgba(232, 248, 242, 0.95);
+  border: 1px solid rgba(11, 94, 74, 0.35);
+  color: #0b5e4a;
+}
+.well-ah-status--revoked {
+  background: rgba(245, 247, 249, 0.95);
+  border: 1px solid rgba(90, 107, 117, 0.35);
+  color: #3a4a54;
+}
+.well-ah-upload.is-disabled {
+  opacity: 0.72;
+}
+.well-ah-upload input[type="file"] {
+  display: block;
+  width: 100%;
+  margin: 0.35rem 0 0.55rem;
+  font: inherit;
+}
+.well-ah-uploads .well-mini-btn {
+  margin-top: 0.25rem;
+}
+.well-ah-audit {
+  margin-top: 0.25rem;
+}
+.well-chart-tab[data-well-section="applehealth"].is-selected,
+.well-chart-tab[data-well-section="applehealth"][aria-selected="true"] {
+  box-shadow: inset 0 -2px 0 #2a7a8a;
+}
