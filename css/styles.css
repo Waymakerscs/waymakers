@@ -6967,8 +6967,12 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   border-color: var(--well-teal);
 }
 
-.well-cal-cell.is-selected .well-cal-dot {
+.well-cal-cell.is-selected .well-cal-dot--appt {
   background: #fff;
+}
+
+.well-cal-cell.is-selected .well-cal-dot--emp {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.9);
 }
 
 .well-cal-cell.has-appts:not(.is-selected) {
@@ -6985,12 +6989,30 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   font-weight: 600;
 }
 
+.well-cal-dots {
+  display: flex;
+  gap: 1px;
+  justify-content: center;
+  align-items: center;
+  margin-top: 0.1rem;
+  min-height: 0.28rem;
+}
+
 .well-cal-dot {
   display: block;
   width: 0.28rem;
   height: 0.28rem;
   margin-top: 0.12rem;
   border-radius: 50%;
+  background: var(--well-teal);
+}
+
+.well-cal-dots .well-cal-dot {
+  margin-top: 0;
+  flex: none;
+}
+
+.well-cal-dot--appt {
   background: var(--well-teal);
 }
 
@@ -7055,11 +7077,409 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   border-color: var(--well-teal-mid);
 }
 
+/* Shared Teams-style clinic calendar */
+.well-rail-card--schedule {
+  border-color: #d5d8f2;
+}
+
+.well-connect {
+  margin: 0.15rem 0 0.75rem;
+  padding: 0.7rem 0.7rem 0.55rem;
+  border: 1px solid #d9dcf3;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f6f7fd 0%, #ffffff 55%);
+}
+
+.well-connect.is-connected {
+  border-color: #b7b4e6;
+  background: linear-gradient(180deg, #f3f3fc 0%, #ffffff 48%);
+}
+
+.well-connect-head {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+
+.well-connect-head strong {
+  display: block;
+  font-size: 0.92rem;
+  color: var(--well-ink);
+}
+
+.well-connect-kicker {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #5b5fc7;
+}
+
+.well-connect-mark {
+  display: grid;
+  grid-template-columns: 0.55rem 0.55rem;
+  gap: 2px;
+  flex: none;
+  margin-top: 0.15rem;
+}
+
+.well-connect-mark span {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 2px;
+  display: block;
+}
+
+.well-connect-mark span:nth-child(1) { background: #5b5fc7; }
+.well-connect-mark span:nth-child(2) { background: #4f6bed; }
+.well-connect-mark span:nth-child(3) { background: #c4314b; }
+.well-connect-mark span:nth-child(4) { background: #0f6cbd; }
+
+.well-connect-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--well-muted);
+}
+
+.well-connect-status.is-on {
+  color: #1f7a46;
+}
+
+.well-connect-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: #9aadb6;
+}
+
+.well-connect-status.is-on .well-connect-dot {
+  background: #1f7a46;
+  box-shadow: 0 0 0 3px rgba(31, 122, 70, 0.18);
+}
+
+.well-emp-fieldset {
+  margin: 0.65rem 0 0;
+  padding: 0.45rem 0 0;
+  border: 0;
+  border-top: 1px solid #e4e7f4;
+}
+
+.well-emp-fieldset legend {
+  padding: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--well-muted);
+}
+
+.well-emp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-top: 0.35rem;
+}
+
+.well-emp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.well-emp-toggle input {
+  accent-color: #5b5fc7;
+  margin: 0;
+}
+
+.well-emp-swatch {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.well-emp-swatch--self {
+  background: #107c10;
+}
+
+.well-emp-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.well-emp-name {
+  font-weight: 650;
+  color: var(--well-ink);
+  line-height: 1.25;
+}
+
+.well-emp-role {
+  color: var(--well-muted);
+  font-size: 0.7rem;
+}
+
+.well-book .well-field select,
+.well-schedule-form select {
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--well-ink);
+  background: #fff;
+  border: 1px solid var(--well-line);
+  border-radius: 6px;
+  padding: 0.4rem 0.55rem;
+  width: 100%;
+}
+
+.well-book .well-field {
+  margin-bottom: 0.45rem;
+}
+
+.well-book .well-field label {
+  font-size: 0.68rem;
+}
+
+.well-slots {
+  margin: 0.35rem 0 0.15rem;
+}
+
+.well-slots-lead,
+.well-held-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--well-muted);
+}
+
+.well-held-label {
+  margin-top: 0.55rem;
+}
+
+.well-slot-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.well-slot-chip {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--well-ink);
+  background: #fff;
+  border: 1px solid #c9d5ea;
+  border-radius: 999px;
+  padding: 0.35rem 0.45rem 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+.well-slot-chip:hover,
+.well-slot-chip:focus-visible {
+  border-color: var(--well-teal);
+  background: var(--well-teal-soft);
+  outline: none;
+}
+
+.well-slot-chip-when {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.well-slot-chip-go {
+  flex: none;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--well-teal);
+  border-radius: 999px;
+  padding: 0.2rem 0.5rem;
+}
+
+.well-held-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.well-held-list li {
+  font-size: 0.75rem;
+  padding: 0.28rem 0;
+  border-bottom: 1px solid #eef1f6;
+  color: var(--well-ink);
+  line-height: 1.35;
+}
+
+.well-held-when {
+  display: block;
+  font-weight: 700;
+  color: #6a4a2a;
+}
+
+.well-src-tag {
+  display: inline-block;
+  margin-left: 0.2rem;
+  padding: 0.02rem 0.32rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #3d3a86;
+  background: #ecebfd;
+  vertical-align: 1px;
+}
+
+.well-dayboard {
+  max-height: 18rem;
+  overflow: auto;
+  border: 1px solid #e6ebf2;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.well-day-row {
+  display: grid;
+  grid-template-columns: 4.4rem minmax(0, 1fr);
+  gap: 0.35rem;
+  padding: 0.35rem 0.45rem;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.well-day-row:last-child {
+  border-bottom: 0;
+}
+
+.well-day-row.is-open {
+  background: #fbfcfd;
+}
+
+.well-day-time {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--well-teal);
+  padding-top: 0.15rem;
+}
+
+.well-day-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.well-slot-open {
+  font-size: 0.75rem;
+  color: var(--well-muted);
+}
+
+.well-busy-pill {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.28rem 0.4rem;
+  border-left: 3px solid var(--emp, #5b5fc7);
+  background: color-mix(in srgb, var(--emp, #5b5fc7) 14%, white);
+  border-radius: 4px;
+  padding: 0.18rem 0.4rem;
+  font-size: 0.74rem;
+  line-height: 1.3;
+}
+
+.well-busy-pill--self {
+  --emp: #107c10;
+}
+
+.well-busy-pill--clinic {
+  --emp: #8a96a3;
+  background: #f4f6f8;
+}
+
+.well-busy-who {
+  font-weight: 800;
+}
+
+.well-busy-title {
+  color: var(--well-ink);
+}
+
+.well-own-appt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--well-teal);
+  background: var(--well-teal-soft);
+  font-size: 0.78rem;
+}
+
+.well-own-appt .well-muted {
+  font-size: 0.7rem;
+}
+
+.well-appt-item.is-just-booked {
+  background: var(--well-teal-soft);
+  border-radius: 6px;
+  padding: 0.4rem 0.45rem;
+  margin: 0 -0.2rem;
+}
+
+.well-earlier {
+  margin-top: 0.45rem;
+}
+
+.well-earlier summary {
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--well-muted);
+}
+
+.well-sched-note {
+  min-height: 0;
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  color: #8a5a2a;
+}
+
+.well-sched-note:empty {
+  display: none;
+}
+
+.well-dayboard .well-appt-row {
+  margin: 0;
+}
+
+.well-dayboard .well-roster-btn {
+  padding: 0.3rem 0.4rem;
+}
+
+.well-grid--patient,
 .well-grid--provider {
-  grid-template-columns: minmax(0, 1fr) minmax(16rem, 19.5rem);
+  grid-template-columns: minmax(0, 1fr) minmax(18.5rem, 23rem);
 }
 
 @media (max-width: 860px) {
+  .well-grid--patient,
   .well-grid--provider {
     grid-template-columns: 1fr;
   }

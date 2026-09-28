@@ -89,6 +89,17 @@ Patient portal tab **Apple Health**:
 
 Jobs / Pages / Cognation are untouched.
 
+## WELL · Shared schedule (Teams-style demo)
+
+Patient and Provider both get a clinic calendar that behaves like a Microsoft Teams shared staff calendar:
+
+- Connect **Microsoft 365 / Teams** (demo). This overlays Hyde Park employee Outlook/Teams busy time. There is no live Graph sign-in and no token is stored.
+- Toggle which employees are visible (Dr. Maya Chen, Dr. James Okonkwo, nurses, front desk). Disconnect hides the overlays and keeps those picks for the next connect.
+- **First available** suggests the next open 30-minute visits from weekday clinic hours (9:00–12:00 and 1:00–4:30), existing WELL appointments, and — once connected — that doctor's mock calendar plus the demo patient's own Outlook holds.
+- One-tap **Book** writes the visit into `cognation.well.portal.v1` (same portal store as the chart). It shows under Upcoming on the patient side and on the provider day board.
+
+Adapter: `js/well-calendar-connect.js` (`WellCalendarConnect.useAdapter` is the seam for a future Graph `calendarView`). Logic checks: `node js/well-calendar-connect.test.js`.
+
 ## Auth (WAYMAKERS Supabase)
 
 - Project ref: `gjrxweezprhiosqewiah` (org COG-NATION) — **separate from Cognation**
