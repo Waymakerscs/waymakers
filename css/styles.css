@@ -838,7 +838,7 @@ body.login-gate-open {
   color: #ED9300;
   text-shadow: 0 2px 0 #000, 0 0 18px rgba(237, 147, 0, 0.55);
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible; /* never clip brand word — later theme scales to fit */
 }
 
 .login-gate-tagline {
@@ -10427,11 +10427,33 @@ body {
 .login-gate-backdrop,
 .login-gate--splash .login-gate-backdrop {
   background:
+    radial-gradient(ellipse 55% 40% at 50% 42%, rgba(255, 255, 255, 0.98), transparent 55%),
+    radial-gradient(ellipse at 18% 12%, rgba(255, 210, 240, 0.35), transparent 28%),
+    radial-gradient(ellipse at 86% 78%, rgba(180, 230, 255, 0.4), transparent 30%),
+    radial-gradient(ellipse at 70% 18%, rgba(220, 200, 255, 0.28), transparent 26%),
     radial-gradient(ellipse at 22% 20%, rgba(255, 255, 255, 0.92), transparent 30%),
     radial-gradient(ellipse at 78% 16%, rgba(186, 200, 218, 0.75), transparent 28%),
     radial-gradient(ellipse at 50% 88%, rgba(140, 158, 180, 0.55), transparent 40%),
-    linear-gradient(145deg, rgba(232, 238, 245, 0.92), rgba(154, 167, 184, 0.88)) !important;
-  backdrop-filter: blur(16px) saturate(120%);
+    linear-gradient(145deg, rgba(232, 238, 245, 0.95), rgba(154, 167, 184, 0.9)) !important;
+  backdrop-filter: blur(16px) saturate(125%);
+}
+
+/* Soft circuit sheen over silver holo (ref match) */
+.login-gate--splash .login-gate-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(90deg, transparent 49%, rgba(90, 110, 140, 0.35) 49.5%, transparent 50.5%),
+    linear-gradient(0deg, transparent 49%, rgba(90, 110, 140, 0.28) 49.5%, transparent 50.5%),
+    linear-gradient(135deg, transparent 48%, rgba(120, 150, 180, 0.2) 49%, transparent 51%),
+    radial-gradient(circle at 20% 30%, rgba(255,255,255,0.5) 0 1px, transparent 2px),
+    radial-gradient(circle at 70% 60%, rgba(255,255,255,0.45) 0 1px, transparent 2px),
+    radial-gradient(circle at 40% 75%, rgba(255,255,255,0.4) 0 1px, transparent 2px);
+  background-size: 72px 72px, 72px 72px, 96px 96px, 72px 72px, 96px 96px, 80px 80px;
+  mix-blend-mode: soft-light;
 }
 
 .login-gate-panel,
@@ -10445,14 +10467,24 @@ body {
     0 0 64px rgba(255, 255, 255, 0.35),
     inset 0 1px rgba(255, 255, 255, 0.75) !important;
   color: var(--wm-ink);
+  overflow-x: visible !important;
 }
 
-/* Quote / tagline ABOVE the WAYMAKERS title */
+.login-gate--splash .login-gate-panel {
+  width: min(100%, 36rem);
+}
+
+/* Quote / tagline ABOVE the WAYMAKERS title — full word visible (scale, never clip) */
 .login-gate-brand--splash {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.35rem;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible !important;
+  container-type: inline-size;
+  container-name: wm-brand;
 }
 
 .login-gate-tagline,
@@ -10471,18 +10503,49 @@ body {
   text-shadow: 0 0 18px rgba(255, 255, 255, 0.8) !important;
 }
 
-.login-gate-brand--splash .login-gate-brand-name {
+/* Black letters + white glow, letters touching (Cognation-tight), scale to container */
+.login-gate-brand--splash .login-gate-brand-name,
+.login-gate--splash .login-gate-brand--splash .login-gate-brand-name {
+  display: block !important;
+  box-sizing: border-box;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0.1rem auto 0 !important;
+  padding-inline: 0.12em;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: nowrap !important;
   color: #000 !important;
-  font-size: clamp(2.6rem, 10vw, 4.7rem);
-  font-weight: 800;
-  letter-spacing: -0.09em; /* letters touching */
-  line-height: 0.82;
-  text-transform: uppercase;
+  font-family: "Oswald", system-ui, sans-serif !important;
+  /* ~9 tight glyphs ≈ 4.6em; 18cqi keeps full WAYMAKERS inside the panel */
+  font-size: clamp(1.35rem, 18cqi, 3.45rem) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.085em !important;
+  line-height: 0.9 !important;
+  text-align: center !important;
+  text-transform: uppercase !important;
   text-shadow:
-    0 0 10px rgba(0, 0, 0, 0.45),
-    0 0 28px rgba(0, 0, 0, 0.35),
-    0 0 64px rgba(0, 0, 0, 0.25),
-    0 1px 0 rgba(255, 255, 255, 0.35);
+    0 0 4px #fff,
+    0 0 10px #fff,
+    0 0 22px rgba(255, 255, 255, 0.98),
+    0 0 42px rgba(255, 255, 255, 0.85),
+    0 0 70px rgba(255, 255, 255, 0.55) !important;
+}
+
+@media (max-width: 480px) {
+  .login-gate-brand--splash .login-gate-brand-name,
+  .login-gate--splash .login-gate-brand--splash .login-gate-brand-name {
+    font-size: clamp(1.3rem, 17cqi, 2.65rem) !important;
+    letter-spacing: -0.09em !important;
+  }
+  .login-gate-tagline,
+  .login-gate-brand--splash .login-gate-tagline {
+    font-size: clamp(0.85rem, 3.8vw, 1.05rem) !important;
+    letter-spacing: 0.02em !important;
+    text-transform: none !important;
+    font-style: italic !important;
+    font-weight: 400 !important;
+  }
 }
 
 .login-gate-eyebrow {
