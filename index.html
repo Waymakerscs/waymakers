@@ -229,7 +229,7 @@
           <button type="button" class="btn btn-secondary login-demo-unlock" data-demo-unlock>Demo unlock</button>
         </p>
         <p class="form-hint login-demo-unlock-note">
-          Local demo — not production auth. No password is shipped. A WELL code is created in this browser after unlock.
+          Local demo — not production auth. Opens this browser session only. WELL keeps its own sign-in.
         </p>
         <p class="form-hint login-demo-hint" data-login-demo-hint hidden>Sign in with the email and password you used to create your WAYMAKERS account.</p>
         <p class="form-hint login-demo-storage-hint">Your account is secured by WAYMAKERS sign-in.</p>
@@ -277,9 +277,9 @@
                     </div>
                     <div class="well-chrome-end">
                       <div class="well-session-bar" data-well-session-bar hidden>
-                        <span class="well-session-chip" data-well-session-chip title="Demo session only. Ends when this tab closes. Not production auth.">
+                        <span class="well-session-chip" data-well-session-chip title="Session ends when this tab closes">
                           <span class="well-session-dot" aria-hidden="true"></span>
-                          Demo session · not production auth
+                          WELL locked session
                         </span>
                         <button type="button" class="well-lock-btn" data-well-lock-btn>
                           Lock WELL
@@ -313,7 +313,7 @@
                     </div>
                   </div>
                   <p class="well-disclaimer" role="note">
-                    Local demo — not production auth / not HIPAA. Not a real EHR · not a production clinical system · PHI must not leave the browser.
+                    Demo chart · not a production EHR · not HIPAA · PHI must not leave the browser. WELL sign-in is a second lock, separate from site sign-in.
                   </p>
                 </header>
 
@@ -332,33 +332,27 @@
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                       </svg>
                     </div>
-                    <p class="well-auth-eyebrow">Demo step-up · not production auth</p>
-                    <h4 id="well-auth-title" class="well-auth-title">WELL demo chart</h4>
+                    <p class="well-auth-eyebrow">Second authentication lock</p>
+                    <h4 id="well-auth-title" class="well-auth-title">WELL clinical sign-in</h4>
                     <p id="well-auth-desc" class="well-auth-desc">
-                      Separate from WAYMAKERS site sign-in. This lock is not clinical authentication.
+                      Patient and Provider stay locked until you complete WELL username, password, and a verification code. Separate from WAYMAKERS site sign-in.
                     </p>
 
-                    <div class="well-auth-demo-chrome" data-well-demo-chrome role="note" hidden>
-                      <strong>Local demo — not production auth / not HIPAA.</strong>
-                      Demo EHR only. PHI must not leave this browser. The one-time code is created here after demo unlock. It is not shipped with the site.
-                    </div>
-
-                    <div class="well-auth-steps" data-well-auth-steps hidden>
-                      <span class="well-auth-step is-active" data-well-auth-step-indicator="1">1 · Name</span>
-                      <span class="well-auth-step" data-well-auth-step-indicator="2">2 · Code</span>
+                    <div class="well-auth-steps" data-well-auth-steps>
+                      <span class="well-auth-step is-active" data-well-auth-step-indicator="1">1 · Credentials</span>
+                      <span class="well-auth-step" data-well-auth-step-indicator="2">2 · 2FA</span>
                     </div>
 
                     <form
                       class="well-auth-form"
-                      data-well-auth-form="demo"
+                      data-well-auth-form="credentials"
                       action="#"
                       method="post"
                       novalidate
                       autocomplete="off"
-                      hidden
                     >
                       <div class="form-group">
-                        <label for="well-auth-username">Display name for this local demo</label>
+                        <label for="well-auth-username">WELL username</label>
                         <input
                           type="text"
                           id="well-auth-username"
@@ -367,15 +361,26 @@
                           autocapitalize="none"
                           spellcheck="false"
                           required
-                          placeholder="Your name"
+                          placeholder="WELL username"
+                        >
+                      </div>
+                      <div class="form-group">
+                        <label for="well-auth-password">WELL password</label>
+                        <input
+                          type="password"
+                          id="well-auth-password"
+                          name="wellPassword"
+                          autocomplete="off"
+                          required
+                          placeholder="••••••••"
                         >
                       </div>
                       <p class="well-auth-status" data-well-auth-status="credentials" hidden role="status" aria-live="polite"></p>
                       <div class="form-actions well-auth-actions">
-                        <button type="submit" class="btn btn-primary well-auth-submit">Continue</button>
+                        <button type="submit" class="btn btn-primary well-auth-submit">Continue to 2FA</button>
                       </div>
                       <p class="form-hint well-auth-hint">
-                        No password ships with this site. Continue to create a one-time code in this browser.
+                        Separate from WAYMAKERS site sign-in. The password is checked on the server. It is not stored in this page.
                       </p>
                     </form>
 
@@ -389,9 +394,9 @@
                       hidden
                     >
                       <div class="well-auth-demo-code" data-well-auth-demo-code role="note">
-                        <span class="well-auth-demo-label">Local demo code</span>
-                        <strong class="well-auth-demo-value">Created in this browser: <code data-well-auth-code-display>————</code></strong>
-                        <span class="well-auth-demo-note">Not sent by SMS. Not stored as a site password.</span>
+                        <span class="well-auth-demo-label">Verification code</span>
+                        <strong class="well-auth-demo-value">Created for this sign-in: <code data-well-auth-code-display>————</code></strong>
+                        <span class="well-auth-demo-note">Shown once for this attempt. Not sent by SMS. Not stored as a site password.</span>
                       </div>
                       <div class="form-group">
                         <label for="well-auth-otp">6-digit verification code</label>
@@ -411,13 +416,12 @@
                       <p class="well-auth-status" data-well-auth-status="otp" hidden role="status" aria-live="polite"></p>
                       <div class="form-actions well-auth-actions">
                         <button type="button" class="btn btn-secondary" data-well-auth-back>Back</button>
-                        <button type="submit" class="btn btn-primary well-auth-submit">Unlock demo chart</button>
+                        <button type="submit" class="btn btn-primary well-auth-submit">Unlock WELL</button>
                       </div>
+                      <p class="form-hint well-auth-hint">
+                        Enter the 6-digit code shown above.
+                      </p>
                     </form>
-
-                    <p class="well-auth-offline" data-well-auth-offline role="status">
-                      WELL clinical sign-in is not live. Use Demo unlock or <code>?demo=1</code> for a local demo. No production identity provider is connected.
-                    </p>
                   </div>
                 </div>
 
