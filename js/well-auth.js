@@ -1,21 +1,21 @@
 /**
- * WELL second authentication lock + demo 2FA (step-up gate).
+ * WELL demo step-up gate.
  *
- * Separate from Cognation site login (alexa / TowerCommune26).
+ * Not production auth · not HIPAA · demo EHR only.
+ * PHI must not leave the browser.
+ *
+ * Unlock is the non-secret flag WAYMAKERSConfig.well.demoUnlock
+ * (alias: CognationConfig.well.demoUnlock). No password or OTP ships here.
+ *
  * Session: sessionStorage cognation.well.auth.v1 (clears on tab close).
- *
- * Demo only — not a real EHR · not HIPAA-certified · no PHI leaves the browser.
+ * Key name is Cognation naming debt — keep it so existing demo sessions
+ * and callers do not break. Rename is a follow-up.
  */
 (function () {
   "use strict";
 
   var AUTH_KEY = "cognation.well.auth.v1";
   var TTL_MS = 4 * 60 * 60 * 1000; /* optional soft TTL note; tab close still ends session */
-  var EXPECTED_USERS = { "well-alexa": true, alexa: true };
-  var EXPECTED_PASS = "WellLock26";
-  var DEMO_OTP = "246801";
-
-  var pendingOtp = null;
 
   function $(sel, root) {
     return (root || document).querySelector(sel);
@@ -23,6 +23,13 @@
 
   function $all(sel, root) {
     return Array.prototype.slice.call((root || document).querySelectorAll(sel));
+  }
+
+  function demoUnlockEnabled() {
+    var cfg = window.WAYMAKERSConfig || window.CognationConfig || {};
+    var well = cfg.well;
+    if (well && typeof well.demoUnlock === "boolean") return well.demoUnlock;
+    return true;
   }
 
   function readSession() {
@@ -60,38 +67,21 @@
     el.classList.toggle("is-error", !!isError);
   }
 
-  function setStep(root, step) {
-    root.setAttribute("data-well-auth-step", String(step));
-    $all("[data-well-auth-step-indicator]", root).forEach(function (el) {
-      var n = el.getAttribute("data-well-auth-step-indicator");
-      el.classList.toggle("is-active", n === String(step));
-      el.classList.toggle("is-done", Number(n) < step);
-    });
-    var cred = $('[data-well-auth-form="credentials"]', root);
-    var otp = $('[data-well-auth-form="otp"]', root);
-    if (cred) cred.hidden = step !== 1;
-    if (otp) otp.hidden = step !== 2;
-    if (step === 1) {
-      pendingOtp = null;
-      var display = $("[data-well-auth-code-display]", root);
-      if (display) display.textContent = "————";
-      var otpInput = $("#well-auth-otp", root);
-      if (otpInput) otpInput.value = "";
-      setStatus(root, "otp", "");
-      window.setTimeout(function () {
-        var u = $("#well-auth-username", root);
-        if (u) u.focus();
-      }, 30);
-    } else if (step === 2) {
-      pendingOtp = DEMO_OTP;
-      var codeEl = $("[data-well-auth-code-display]", root);
-      if (codeEl) codeEl.textContent = pendingOtp;
-      setStatus(root, "credentials", "");
-      window.setTimeout(function () {
-        var o = $("#well-auth-otp", root);
-        if (o) o.focus();
-      }, 30);
-    }
+  function applyDemoMode(root) {
+    var on = demoUnlockEnabled();
+    var form = $('[data-well-auth-form="demo"]', root);
+    var offline = $("[data-well-auth-offline]", root);
+    var chrome = $("[data-well-demo-chrome]", root);
+    if (form) form.hidden = !on;
+    if (offline) offline.hidden = on;
+    if (chrome) chrome.hidden = !on;
+  }
+
+  function resetDemoForm(root) {
+    var input = $("#well-auth-username", root);
+    if (input) input.value = "";
+    setStatus(root, "credentials", "");
+    applyDemoMode(root);
   }
 
   function setLockedUi(root, locked) {
@@ -117,7 +107,6 @@
         secured.removeAttribute("aria-hidden");
         secured.removeAttribute("inert");
       }
-      /* Patient/provider roots stay queryable; visually hide via CSS when locked */
     }
 
     /* Hide chart roots from AT while locked */
@@ -145,7 +134,7 @@
       });
     }
 
-    if (locked) setStep(root, 1);
+    if (locked) resetDemoForm(root);
   }
 
   function unlock(root, username) {
@@ -153,10 +142,9 @@
       ok: true,
       user: username,
       at: Date.now(),
-      factor: "password+otp",
-      note: "sessionStorage · expires on tab close · soft TTL 4h",
+      factor: "demo-unlock",
+      note: "demo EHR · not production auth · sessionStorage · expires on tab close · soft TTL 4h",
     });
-    pendingOtp = null;
     setLockedUi(root, false);
     document.dispatchEvent(
       new CustomEvent("cognation:well-auth", { detail: { unlocked: true, user: username } })
@@ -166,17 +154,14 @@
   function lock(root, opts) {
     opts = opts || {};
     writeSession(null);
-    pendingOtp = null;
     if (!root) {
       $all("[data-well-app]").forEach(function (r) {
         setLockedUi(r, true);
         setStatus(r, "credentials", opts.message || "");
-        setStatus(r, "otp", "");
       });
     } else {
       setLockedUi(root, true);
       setStatus(root, "credentials", opts.message || "", !!opts.isError);
-      setStatus(root, "otp", "");
     }
     document.dispatchEvent(
       new CustomEvent("cognation:well-auth", { detail: { unlocked: false } })
@@ -210,59 +195,30 @@
     if (!root || root.__wellAuthWired) return;
     root.__wellAuthWired = true;
 
-    var credForm = $('[data-well-auth-form="credentials"]', root);
-    var otpForm = $('[data-well-auth-form="otp"]', root);
-    var backBtn = $("[data-well-auth-back]", root);
+    var demoForm = $('[data-well-auth-form="demo"]', root);
     var lockBtn = $("[data-well-lock-btn]", root);
 
-    if (credForm) {
-      credForm.addEventListener("submit", function (e) {
+    if (demoForm) {
+      demoForm.addEventListener("submit", function (e) {
         e.preventDefault();
+        if (!demoUnlockEnabled()) {
+          setStatus(root, "credentials", "WELL clinical sign-in is not live.", true);
+          applyDemoMode(root);
+          return;
+        }
         var user = normalizeUser(($("#well-auth-username", root) || {}).value);
-        var pass = String(($("#well-auth-password", root) || {}).value || "");
-        if (!EXPECTED_USERS[user] || pass !== EXPECTED_PASS) {
-          setStatus(root, "credentials", "Wrong WELL username or password.", true);
+        if (!user) {
+          setStatus(root, "credentials", "Enter a display name for this demo session.", true);
           return;
         }
         setStatus(root, "credentials", "");
-        setStep(root, 2);
-      });
-    }
-
-    if (otpForm) {
-      otpForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var input = $("#well-auth-otp", root);
-        var code = String((input && input.value) || "").replace(/\s+/g, "");
-        var expected = pendingOtp || DEMO_OTP;
-        if (!/^\d{6}$/.test(code) || code !== expected) {
-          setStatus(root, "otp", "Wrong verification code. Try the demo authenticator code shown above.", true);
-          return;
-        }
-        var userEl = $("#well-auth-username", root);
-        unlock(root, normalizeUser(userEl && userEl.value) || "well-alexa");
-        setStatus(root, "otp", "");
-      });
-    }
-
-    if (backBtn) {
-      backBtn.addEventListener("click", function () {
-        setStep(root, 1);
-        setStatus(root, "credentials", "");
+        unlock(root, user);
       });
     }
 
     if (lockBtn) {
       lockBtn.addEventListener("click", function () {
-        lock(root, { message: "WELL locked. Sign in again to open the chart." });
-      });
-    }
-
-    /* OTP: digits only */
-    var otpInput = $("#well-auth-otp", root);
-    if (otpInput) {
-      otpInput.addEventListener("input", function () {
-        otpInput.value = otpInput.value.replace(/\D/g, "").slice(0, 6);
+        lock(root, { message: "WELL locked. Acknowledge the demo notice to open the chart again." });
       });
     }
   }
@@ -287,11 +243,14 @@
       lock(null);
     },
     unlockSession: function (username) {
+      if (!demoUnlockEnabled()) return false;
       var root = $("[data-well-app]");
-      if (root) unlock(root, username || "well-alexa");
+      if (root) unlock(root, username || "demo");
+      return true;
     },
     onWellPanelShown: onWellPanelShown,
     getSession: readSession,
+    demoUnlockEnabled: demoUnlockEnabled,
   };
 
   if (document.readyState === "loading") {

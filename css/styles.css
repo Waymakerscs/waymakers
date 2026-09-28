@@ -5704,6 +5704,46 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   border-radius: 10px;
 }
 
+.well-auth-demo-chrome {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--well-warn, #6a3d12);
+  background: rgba(255, 248, 239, 0.95);
+  border: 1px solid #e8d4b8;
+  border-radius: 10px;
+}
+
+.well-auth-offline {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.home-shell {
+  padding: 0.35rem 0 1rem;
+}
+
+.home-title {
+  margin: 0 0 0.2rem;
+  letter-spacing: 0.08em;
+}
+
+.home-dek {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.home-empty {
+  margin: 0.75rem 0 0;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid rgba(30, 50, 80, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  line-height: 1.45;
+}
+
 /* —— WELL second auth lock + demo 2FA —— */
 .well-chrome-end {
   display: flex;
@@ -11138,6 +11178,20 @@ body:has(.waymakers-masthead) .site-header {
   margin: 1rem 0 0;
   font-size: 0.75rem;
   opacity: 0.7;
+}
+.jobs-deferral {
+  margin: 0.55rem 0 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(160, 90, 20, 0.45);
+  background: rgba(255, 244, 230, 0.9);
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+.jobs-chip--deferred {
+  background: rgba(120, 40, 40, 0.1);
+  border-color: rgba(120, 40, 40, 0.4);
+  color: #6e2222;
 }
 
 

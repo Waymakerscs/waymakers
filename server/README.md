@@ -1,6 +1,8 @@
 # COGNATION session + screen-break service
 
-Tiny Node (Express) API that backs the static site’s demo login, activity heartbeat, mandatory screen-break, and auto-logout.
+**Not live** on WAYMAKERS Pages. `waymakers.pages.dev` does not call this process. Site sign-in is WAYMAKERS Supabase (`js/login.js`). This Express app is an in-memory stub (naming still says Cognation). Do not treat it as production auth.
+
+Tiny Node (Express) API for a demo activity heartbeat, mandatory screen-break, and auto-logout. It is not wired to the static site’s login gate.
 
 **v1 storage:** in-memory `Map`. **Restarting the process clears every session.**
 

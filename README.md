@@ -2,6 +2,8 @@
 
 **WAYMAKERS** on Cloudflare Pages (`waymakers.pages.dev`).
 
+Canonical tree, deploy target, and Cognation split: [`SOURCE-OF-TRUTH.md`](SOURCE-OF-TRUTH.md).
+
 Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub/Supabase projects) is **untouched**.
 
 ## Landing
@@ -91,7 +93,7 @@ Jobs / Pages / Cognation are untouched.
 
 - Project ref: `gjrxweezprhiosqewiah` (org COG-NATION) — **separate from Cognation**
 - Browser config: `js/cognation-config.js` → `https://gjrxweezprhiosqewiah.supabase.co`
-- WELL clinical lock is a second, demo-only auth gate (`well-alexa` / `WellLock26` + on-screen 2FA)
+- WELL is a demo EHR step-up gated by the non-secret flag `WAYMAKERSConfig.well.demoUnlock` in `js/cognation-config.js`. No demo password or OTP ships in static assets. Not production auth, not HIPAA; PHI must not leave the browser.
 
 ## Related
 

@@ -248,7 +248,10 @@
         "</span>";
       if (job.external) {
         chips +=
-          '<span class="jobs-chip jobs-chip--external">External</span>';
+          '<span class="jobs-chip jobs-chip--external">External</span>' +
+          '<span class="jobs-chip jobs-chip--deferred">Deeplink only · not live</span>';
+      } else {
+        chips += '<span class="jobs-chip jobs-chip--deferred">Not live</span>';
       }
 
       var actions;
@@ -257,16 +260,16 @@
           '<div class="jobs-card-actions">' +
           '<a class="jobs-apply-btn jobs-apply-btn--external" href="' +
           escapeHtml(job.url) +
-          '" target="_blank" rel="noopener noreferrer">Open on ' +
+          '" target="_blank" rel="noopener noreferrer">Open ' +
           escapeHtml(sourceLabel(job.source)) +
-          "</a>" +
+          " search (deeplink · not live)</a>" +
           "</div>";
       } else {
         actions =
           '<div class="jobs-card-actions">' +
           '<button type="button" class="jobs-apply-btn" data-jobs-apply="' +
           escapeHtml(job.id) +
-          '">Apply</button>' +
+          '">Apply (not live)</button>' +
           "</div>";
       }
 

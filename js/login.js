@@ -1,20 +1,20 @@
 /**
- * Cognation login gate — required username/password (client-side gate on Pages).
- * Not a substitute for server auth; fine for a private $0 preview.
+ * WAYMAKERS login gate — Supabase email/password only.
+ * No demo password ships in this file. If Supabase is not configured,
+ * sign-in fails closed ("not configured") instead of a local password.
  *
  * After credentials succeed, if the account has 2 Tower profiles, show a
  * Choose profile step (Personal / Professional). Session records
  * activeProfileId + profileKind.
  *
  * Session: waymakers.session.v2
- * Demo storage disclaimer: in-browser registry only — not production identity.
+ * CognationAuth remains as an alias (naming debt — do not drop it here).
  */
 (function () {
   "use strict";
 
   var SESSION_KEY = "waymakers.session.v2";
   var EXPECTED_USER = "alexa";
-  var EXPECTED_PASS = "TowerCommune26";
 
   var API_BASE =
     (window.CognationConfig && window.CognationConfig.apiBaseUrl) || "/api";
