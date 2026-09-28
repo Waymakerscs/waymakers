@@ -7134,6 +7134,12 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   text-align: center;
   font-size: 0.78rem;
 }
+.login-demo-hint[hidden],
+.well-auth-form[hidden],
+.well-auth-offline[hidden],
+.well-auth-demo-chrome[hidden] {
+  display: none !important;
+}
 body.login-gate-open {
   overflow: hidden;
 }
