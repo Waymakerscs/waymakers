@@ -250,4 +250,64 @@ assert.strictEqual(cc.doctors().length, 2);
 assert.ok(cc.visitById("sick"));
 assert.ok(/Monday/.test(cc.formatDay("2026-09-28")));
 
+var secretTitle = "Grand rounds about Jordan Rivera MRN CGN-DEMO-11003";
+var patientBusy = cc.presentForRole(
+  {
+    kind: "employee",
+    title: secretTitle,
+    source: "teams",
+    employeeId: "emp-maya",
+    attendees: ["Jordan Rivera"],
+    notes: "Discuss Priya Nair diabetes plan",
+  },
+  "patient",
+  "board"
+);
+assert.strictEqual(patientBusy.label, "Busy");
+assert.strictEqual(patientBusy.title, "");
+assert.strictEqual(patientBusy.sourceLabel, "");
+assert.strictEqual(patientBusy.who, "Maya");
+assert.ok(JSON.stringify(patientBusy).indexOf("Jordan") < 0, "patient view leaked a name");
+assert.ok(JSON.stringify(patientBusy).indexOf("Grand") < 0, "patient view leaked a subject");
+assert.ok(JSON.stringify(patientBusy).indexOf("CGN") < 0, "patient view leaked an MRN");
+assert.ok(JSON.stringify(patientBusy).indexOf("Priya") < 0, "patient view leaked notes");
+assert.ok(JSON.stringify(patientBusy).indexOf("diabetes") < 0);
+
+var patientHeld = cc.presentForRole(
+  { kind: "outlook-self", title: "Work standup — bring labs", source: "outlook", employeeId: "self-patient" },
+  "patient",
+  "held"
+);
+assert.strictEqual(patientHeld.label, "Unavailable");
+assert.strictEqual(patientHeld.title, "");
+assert.strictEqual(patientHeld.who, "You");
+assert.ok(JSON.stringify(patientHeld).indexOf("standup") < 0);
+assert.ok(JSON.stringify(patientHeld).indexOf("labs") < 0);
+
+var otherPatient = cc.presentForRole(
+  { kind: "appointment", title: "HTN follow-up", source: "well", employeeId: "emp-maya", patientName: "Jordan Rivera" },
+  "patient",
+  "board"
+);
+assert.strictEqual(otherPatient.label, "Busy");
+assert.ok(JSON.stringify(otherPatient).indexOf("Jordan") < 0);
+assert.ok(JSON.stringify(otherPatient).indexOf("HTN") < 0);
+
+var ownVisit = cc.presentForRole(
+  { kind: "own-visit", title: "Annual wellness", source: "well" },
+  "patient",
+  "held"
+);
+assert.strictEqual(ownVisit.state, "own");
+assert.strictEqual(ownVisit.label, "Annual wellness");
+
+var providerFull = cc.presentForRole(
+  { kind: "employee", title: secretTitle, source: "teams", employeeId: "emp-maya" },
+  "provider",
+  "board"
+);
+assert.ok(providerFull.title.indexOf("Jordan Rivera") >= 0, "provider should keep the subject");
+assert.ok(providerFull.label.indexOf("Grand rounds") >= 0);
+assert.strictEqual(providerFull.sourceLabel, "Teams");
+
 console.log("well-calendar-connect: " + "ok");

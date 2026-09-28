@@ -97,6 +97,7 @@ Patient and Provider both get a clinic calendar that behaves like a Microsoft Te
 - Toggle which employees are visible (Dr. Maya Chen, Dr. James Okonkwo, nurses, front desk). Disconnect hides the overlays and keeps those picks for the next connect.
 - **First available** suggests the next open 30-minute visits from weekday clinic hours (9:00–12:00 and 1:00–4:30), existing WELL appointments, and — once connected — that doctor's mock calendar plus the demo patient's own Outlook holds.
 - One-tap **Book** writes the visit into `cognation.well.portal.v1` (same portal store as the chart). It shows under Upcoming on the patient side and on the provider day board.
+- **Patient view is busy/free only.** Other patients’ names, reasons, and MRNs, plus Outlook/Teams subjects, attendees, and notes, are not rendered. Slots say Busy or Unavailable. The patient’s own visits still show in full. The provider board keeps full events for clinic scheduling. Demo only — not HIPAA-certified — but the patient calendar is masked that way (`presentForRole`).
 
 Adapter: `js/well-calendar-connect.js` (`WellCalendarConnect.useAdapter` is the seam for a future Graph `calendarView`). Logic checks: `node js/well-calendar-connect.test.js`.
 

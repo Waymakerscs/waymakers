@@ -7162,6 +7162,22 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   box-shadow: 0 0 0 3px rgba(31, 122, 70, 0.18);
 }
 
+.well-privacy-note {
+  margin: 0.35rem 0 0.55rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  background: #f4f7f8;
+  border: 1px solid var(--well-line);
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--well-ink);
+}
+
+.well-busy-pill--private .well-busy-title {
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
 .well-emp-fieldset {
   margin: 0.65rem 0 0;
   padding: 0.45rem 0 0;

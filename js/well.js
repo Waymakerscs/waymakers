@@ -18,6 +18,10 @@
  *   Outlook/Teams busy + first-available slots). Connection and visible-employee
  *   picks live in this same portal store. No live Graph OAuth.
  *
+ *   Privacy boundary: patient calendar HTML is built only from
+ *   WellCalendarConnect.presentForRole(..., "patient"). That view is busy/free
+ *   (and the patient's own visits). Provider HTML may show full events.
+ *
  * Demo only — not a real EHR. Do not claim HIPAA compliance.
  */
 (function () {
@@ -2448,15 +2452,7 @@
       ? '<p class="well-held-label">Held nearby</p><ul class="well-held-list">' +
         result.held
           .map(function (h) {
-            var src = CC.sourceLabel(h.source);
-            return (
-              "<li><span class=\"well-held-when\">" +
-              escapeHtml(h.label) +
-              "</span> " +
-              escapeHtml(h.detail) +
-              (src ? ' <span class="well-src-tag">' + escapeHtml(src) + "</span>" : "") +
-              "</li>"
-            );
+            return renderHeldRow(h, side);
           })
           .join("") +
         "</ul>"
@@ -2508,6 +2504,72 @@
       '<p class="well-muted well-tiny">' +
       escapeHtml(CC.CLINIC_HOURS_LABEL) +
       "</p></div>"
+    );
+  }
+
+  /**
+   * Privacy boundary for shared-calendar chrome.
+   * Patient markup may include only presentForRole() fields (Busy / Unavailable,
+   * or the patient's own visit text). Provider markup may include subjects.
+   */
+  function renderBusyPill(view, color) {
+    var shown = view.role === "provider" ? view.title || view.label : view.label;
+    var who = view.who
+      ? '<span class="well-busy-who">' + escapeHtml(view.who) + "</span>"
+      : "";
+    var src =
+      view.role === "provider" && view.sourceLabel
+        ? '<span class="well-src-tag">' + escapeHtml(view.sourceLabel) + "</span>"
+        : "";
+    var privateCls = view.role === "patient" ? " well-busy-pill--private" : "";
+    var selfCls = view.who === "You" ? " well-busy-pill--self" : "";
+    return (
+      '<span class="well-busy-pill' +
+      privateCls +
+      selfCls +
+      '" style="--emp:' +
+      escapeHtml(color || "#8a96a3") +
+      '" aria-label="' +
+      escapeHtml((view.who ? view.who + ", " : "") + shown) +
+      '">' +
+      who +
+      '<span class="well-busy-title">' +
+      escapeHtml(shown) +
+      "</span>" +
+      src +
+      "</span>"
+    );
+  }
+
+  function renderHeldRow(held, side) {
+    var CC = window.WellCalendarConnect;
+    var view = CC.presentForRole(
+      {
+        kind: held.kind,
+        title: held.kind === "own-visit" ? held.title || held.detail : held.title,
+        source: held.source,
+        employeeId: held.employeeId,
+      },
+      side === "provider" ? "provider" : "patient",
+      "held"
+    );
+    var who =
+      view.role === "patient" && view.who
+        ? escapeHtml(view.who) + " · "
+        : "";
+    var text = view.role === "provider" ? view.label : view.label;
+    var src =
+      view.role === "provider" && view.sourceLabel
+        ? ' <span class="well-src-tag">' + escapeHtml(view.sourceLabel) + "</span>"
+        : "";
+    return (
+      "<li><span class=\"well-held-when\">" +
+      escapeHtml(held.label) +
+      "</span> " +
+      who +
+      escapeHtml(text) +
+      src +
+      "</li>"
     );
   }
 
@@ -2596,29 +2658,33 @@
             if (!emp) return;
             CC.eventsOn(id, dateIso).forEach(function (ev) {
               if (!CC.overlaps(startMin, end, ev.startMin, ev.endMin)) return;
-              pills.push(
-                '<span class="well-busy-pill" style="--emp:' +
-                  escapeHtml(emp.color) +
-                  '"><span class="well-busy-who">' +
-                  escapeHtml(emp.short) +
-                  '</span><span class="well-busy-title">' +
-                  escapeHtml(ev.title) +
-                  '</span><span class="well-src-tag">' +
-                  escapeHtml(CC.sourceLabel(ev.source)) +
-                  "</span></span>"
+              var view = CC.presentForRole(
+                {
+                  kind: "employee",
+                  title: ev.title,
+                  source: ev.source,
+                  employeeId: id,
+                },
+                side,
+                "board"
               );
+              pills.push(renderBusyPill(view, emp.color));
             });
           });
           if (side === "patient" && cc.includePatientCalendar) {
             CC.eventsOn(CC.PATIENT_CAL_ID, dateIso).forEach(function (ev) {
               if (!CC.overlaps(startMin, end, ev.startMin, ev.endMin)) return;
-              pills.push(
-                '<span class="well-busy-pill well-busy-pill--self"><span class="well-busy-who">You</span><span class="well-busy-title">' +
-                  escapeHtml(ev.title) +
-                  '</span><span class="well-src-tag">' +
-                  escapeHtml(CC.sourceLabel(ev.source)) +
-                  "</span></span>"
+              var selfView = CC.presentForRole(
+                {
+                  kind: "outlook-self",
+                  title: ev.title,
+                  source: ev.source,
+                  employeeId: CC.PATIENT_CAL_ID,
+                },
+                "patient",
+                "board"
               );
+              pills.push(renderBusyPill(selfView, "#107c10"));
             });
           }
         }
@@ -2639,13 +2705,18 @@
           }
         });
         if (clinicBooked) {
-          pills.unshift(
-            '<span class="well-busy-pill well-busy-pill--clinic"><span class="well-busy-who">' +
-              (side === "provider" ? "Schedule" : "Clinic") +
-              '</span><span class="well-busy-title">' +
-              (side === "provider" ? "Overlaps a visit" : "Booked") +
-              "</span></span>"
-          );
+          if (side === "provider") {
+            pills.unshift(
+              '<span class="well-busy-pill well-busy-pill--clinic"><span class="well-busy-who">Schedule</span><span class="well-busy-title">Overlaps a visit</span></span>'
+            );
+          } else {
+            pills.unshift(
+              renderBusyPill(
+                CC.presentForRole({ kind: "appointment", title: "", source: "well" }, "patient", "board"),
+                "#8a96a3"
+              )
+            );
+          }
         }
         var open = !apptHtml && !pills.length;
         var body = open ? '<span class="well-slot-open">Open</span>' : apptHtml + pills.join("");
@@ -3009,6 +3080,7 @@
       '<section class="well-rail-card well-rail-card--schedule" data-well-schedule-card>' +
       "<h4>Schedule</h4>" +
       '<p class="well-muted well-tiny">Shared clinic calendar · book the next open visit with your doctor.</p>' +
+      '<p class="well-privacy-note">Private busy/free on this side. Other patients, visit reasons, and Outlook/Teams subjects stay hidden. Your own visits still show in full.</p>' +
       renderTeamsConnect(data, "patient") +
       renderMonthCalendar(data, { side: "patient" }) +
       '<div class="well-cal-daypanel">' +

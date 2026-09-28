@@ -17,6 +17,12 @@
  * Clinic hours (demo): weekdays 09:00–12:00 and 13:00–16:30, 30-minute slots.
  * Visibility toggles only change the board. Booking still avoids that
  * doctor's meetings when the clinic calendar is connected.
+ *
+ * Privacy boundary: presentForRole(block, role, surface).
+ *   provider — full subject, source, and description (clinic operations).
+ *   patient  — free/busy only. No subjects, attendees, notes, other patients'
+ *              names, reasons, or MRNs. Own WELL visits may keep their own detail.
+ * The demo is not HIPAA-certified. The patient view is still masked this way.
  */
 (function (root) {
   "use strict";
@@ -441,9 +447,15 @@
       if (clinicianOf(appt) !== clinicianId) continue;
       var iv = appointmentInterval(appt);
       if (!iv || iv.date !== dateIso) continue;
-      if (overlaps(start, end, iv.start, iv.end)) {
-        return { kind: "appointment", title: "Already booked", source: "well", appointmentId: appt.id || "" };
-      }
+        if (overlaps(start, end, iv.start, iv.end)) {
+          return {
+            kind: "appointment",
+            title: "Already booked",
+            source: "well",
+            employeeId: clinicianId,
+            appointmentId: appt.id || "",
+          };
+        }
     }
     if (opts.connected) {
       var events = listEvents(clinicianId, dateIso);
@@ -485,6 +497,67 @@
     return "";
   }
 
+  var PATIENT_BUSY_LABEL = "Busy";
+  var PATIENT_UNAVAILABLE_LABEL = "Unavailable";
+
+  function blockWho(block) {
+    if (!block) return "";
+    if (block.kind === "outlook-self" || block.employeeId === PATIENT_CAL_ID) return "You";
+    if (block.kind === "own-visit") return "You";
+    if (block.employeeId) {
+      var emp = staffById(block.employeeId);
+      if (emp) return emp.short;
+    }
+    return "";
+  }
+
+  /**
+   * Single display gate for shared-calendar UI.
+   * Patient results never copy title, notes, attendees, or other patients' fields
+   * except an own WELL visit (kind "own-visit"), which may keep that visit's own text.
+   * surface "held" uses "Unavailable"; the day board uses "Busy".
+   */
+  function presentForRole(block, role, surface) {
+    block = block || {};
+    var provider = role === "provider";
+    if (provider) {
+      return {
+        role: "provider",
+        state: block.kind === "own-visit" ? "own" : "busy",
+        label: describeBlock(block),
+        title: block.title || "",
+        who: blockWho(block),
+        source: block.source || "",
+        sourceLabel: sourceLabel(block.source),
+      };
+    }
+    if (block.kind === "own-visit") {
+      var ownLabel = block.title || "Your visit";
+      return {
+        role: "patient",
+        state: "own",
+        label: ownLabel,
+        title: ownLabel,
+        who: "You",
+        source: "",
+        sourceLabel: "",
+      };
+    }
+    var opaque = surface === "held" ? PATIENT_UNAVAILABLE_LABEL : PATIENT_BUSY_LABEL;
+    var who = "";
+    if (block.kind === "outlook-self" || block.employeeId === PATIENT_CAL_ID) who = "You";
+    else if (block.employeeId && staffById(block.employeeId)) who = staffById(block.employeeId).short;
+    return {
+      role: "patient",
+      state: "busy",
+      label: opaque,
+      title: "",
+      who: who,
+      source: "",
+      sourceLabel: "",
+    };
+  }
+
   function searchOpenings(opts) {
     opts = opts || {};
     var count = opts.count || 5;
@@ -523,6 +596,8 @@
               time: timeHeld,
               label: formatWhen(iso, timeHeld),
               detail: describeBlock(reason),
+              title: reason.title || "",
+              employeeId: reason.employeeId || "",
               source: reason.source || "",
               kind: reason.kind,
             });
@@ -581,6 +656,9 @@
     blockAt: slotBlock,
     describeBlock: describeBlock,
     sourceLabel: sourceLabel,
+    PATIENT_BUSY_LABEL: PATIENT_BUSY_LABEL,
+    PATIENT_UNAVAILABLE_LABEL: PATIENT_UNAVAILABLE_LABEL,
+    presentForRole: presentForRole,
     searchOpenings: searchOpenings,
     useAdapter: useAdapter,
   };
