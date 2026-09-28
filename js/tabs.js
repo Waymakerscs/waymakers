@@ -1,6 +1,6 @@
 /**
  * Accessible tabs (WAI-ARIA APG pattern).
- * Labels/ids live in HTML — WELL · PAGES · JOBS (empty panels).
+ * Labels/ids live in HTML — WELL · PAGES · JOBS.
  */
 (function () {
   "use strict";
@@ -27,6 +27,15 @@
         panels[i].hidden = !selected;
       });
       if (focusTab) tabs[index].focus();
+      var activeTab = tabs[index];
+      if (
+        activeTab &&
+        activeTab.id === "tab-well" &&
+        window.CognationWellAuth &&
+        typeof window.CognationWellAuth.onWellPanelShown === "function"
+      ) {
+        window.CognationWellAuth.onWellPanelShown();
+      }
     }
 
     tabs.forEach(function (tab, i) {

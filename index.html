@@ -257,11 +257,222 @@
 
           <div class="tab-panels">
             <div role="tabpanel" id="panel-well" aria-labelledby="tab-well">
-              <div class="wm-empty-panel" data-empty-panel="well" aria-hidden="true"></div>
+              <div class="well-app is-locked" data-well-app data-well-side="patient" data-well-auth-state="locked">
+                <header class="well-chrome">
+                  <div class="well-chrome-top">
+                    <div class="well-brand-block">
+                      <h3 class="well-title">WELL</h3>
+                      <p class="well-dek">Patient chart · fillable docs · provider view-only</p>
+                    </div>
+                    <div class="well-chrome-end">
+                      <div class="well-session-bar" data-well-session-bar hidden>
+                        <span class="well-session-chip" data-well-session-chip title="Session ends when this tab closes">
+                          <span class="well-session-dot" aria-hidden="true"></span>
+                          WELL locked session
+                        </span>
+                        <button type="button" class="well-lock-btn" data-well-lock-btn>
+                          Lock WELL
+                        </button>
+                      </div>
+                      <div
+                        class="well-side-toggle"
+                        data-well-side-toggle
+                        role="tablist"
+                        aria-label="WELL portal side"
+                      >
+                        <button
+                          type="button"
+                          class="well-side-btn"
+                          role="tab"
+                          id="well-side-patient"
+                          data-well-side-btn="patient"
+                          aria-controls="well-patient-panel"
+                          aria-selected="true"
+                        >Patient</button>
+                        <button
+                          type="button"
+                          class="well-side-btn"
+                          role="tab"
+                          id="well-side-provider"
+                          data-well-side-btn="provider"
+                          aria-controls="well-provider-panel"
+                          aria-selected="false"
+                        >Provider</button>
+                      </div>
+                    </div>
+                  </div>
+                  <p class="well-disclaimer" role="note">
+                    Demo only · not a real EHR · not HIPAA-certified · no PHI leaves the browser.
+                  </p>
+                </header>
+
+                <div
+                  class="well-auth-lock"
+                  data-well-auth-lock
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="well-auth-title"
+                  aria-describedby="well-auth-desc"
+                >
+                  <div class="well-auth-card">
+                    <div class="well-auth-badge" aria-hidden="true">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                    </div>
+                    <p class="well-auth-eyebrow">Second authentication lock</p>
+                    <h4 id="well-auth-title" class="well-auth-title">WELL clinical sign-in</h4>
+                    <p id="well-auth-desc" class="well-auth-desc">
+                      Chart and provider content stay locked until you complete username/password and a demo second factor (2FA). Separate from the WAYMAKERS site login.
+                    </p>
+
+                    <div class="well-auth-steps" data-well-auth-steps aria-hidden="true">
+                      <span class="well-auth-step is-active" data-well-auth-step-indicator="1">1 · Credentials</span>
+                      <span class="well-auth-step" data-well-auth-step-indicator="2">2 · 2FA</span>
+                    </div>
+
+                    <form
+                      class="well-auth-form"
+                      data-well-auth-form="credentials"
+                      action="#"
+                      method="post"
+                      novalidate
+                      autocomplete="off"
+                    >
+                      <div class="form-group">
+                        <label for="well-auth-username">WELL username</label>
+                        <input
+                          type="text"
+                          id="well-auth-username"
+                          name="wellUsername"
+                          autocomplete="off"
+                          autocapitalize="none"
+                          spellcheck="false"
+                          required
+                          placeholder="well-alexa"
+                        >
+                      </div>
+                      <div class="form-group">
+                        <label for="well-auth-password">WELL password</label>
+                        <input
+                          type="password"
+                          id="well-auth-password"
+                          name="wellPassword"
+                          autocomplete="off"
+                          required
+                          placeholder="••••••••"
+                        >
+                      </div>
+                      <p class="well-auth-status" data-well-auth-status="credentials" hidden role="status" aria-live="polite"></p>
+                      <div class="form-actions well-auth-actions">
+                        <button type="submit" class="btn btn-primary well-auth-submit">Continue to 2FA</button>
+                      </div>
+                      <p class="form-hint well-auth-hint">
+                        Demo WELL credentials: <code>well-alexa</code> or <code>alexa</code> · password <code>WellLock26</code>
+                      </p>
+                    </form>
+
+                    <form
+                      class="well-auth-form"
+                      data-well-auth-form="otp"
+                      action="#"
+                      method="post"
+                      novalidate
+                      autocomplete="off"
+                      hidden
+                    >
+                      <div class="well-auth-demo-code" data-well-auth-demo-code role="note">
+                        <span class="well-auth-demo-label">Demo authenticator / second factor</span>
+                        <strong class="well-auth-demo-value">Demo authenticator code: <code data-well-auth-code-display>————</code></strong>
+                        <span class="well-auth-demo-note">Shown on-screen for this prototype — not sent by SMS.</span>
+                      </div>
+                      <div class="form-group">
+                        <label for="well-auth-otp">6-digit verification code</label>
+                        <input
+                          type="text"
+                          id="well-auth-otp"
+                          name="wellOtp"
+                          inputmode="numeric"
+                          pattern="[0-9]{6}"
+                          maxlength="6"
+                          autocomplete="one-time-code"
+                          required
+                          placeholder="246801"
+                          spellcheck="false"
+                        >
+                      </div>
+                      <p class="well-auth-status" data-well-auth-status="otp" hidden role="status" aria-live="polite"></p>
+                      <div class="form-actions well-auth-actions">
+                        <button type="button" class="btn btn-secondary" data-well-auth-back>Back</button>
+                        <button type="submit" class="btn btn-primary well-auth-submit">Unlock WELL</button>
+                      </div>
+                      <p class="form-hint well-auth-hint">
+                        Enter the demo authenticator code shown above (prototype always uses a displayed code).
+                      </p>
+                    </form>
+                  </div>
+                </div>
+
+                <div class="well-secured" data-well-secured aria-hidden="true" inert>
+                  <div
+                    class="well-patient-side"
+                    id="well-patient-panel"
+                    data-well-patient-side
+                    role="tabpanel"
+                    aria-labelledby="well-side-patient"
+                  >
+                    <div class="well-grid well-grid--patient" data-well-patient-root></div>
+                  </div>
+
+                  <div
+                    class="well-provider-side"
+                    id="well-provider-panel"
+                    data-well-provider-side
+                    role="tabpanel"
+                    aria-labelledby="well-side-provider"
+                    hidden
+                  >
+                    <div class="well-grid well-grid--provider" data-well-provider-root></div>
+                  </div>
+                </div>
+              </div>
             </div>
+
             <div role="tabpanel" id="panel-pages" aria-labelledby="tab-pages" hidden>
-              <div class="wm-empty-panel" data-empty-panel="pages" aria-hidden="true"></div>
+              <div class="pages-shell" data-pages-shell>
+                <header class="pages-intro">
+                  <h3 class="pages-title">PAGES</h3>
+                  <p class="pages-dek">The WAYMAKERS Yellow Pages · local businesses A–Z</p>
+                </header>
+
+                <div class="pages-search-row">
+                  <label class="pages-sr-only" for="pages-search">Search by name or keyword</label>
+                  <input
+                    type="search"
+                    id="pages-search"
+                    class="pages-search"
+                    data-pages-search
+                    placeholder="Search name or keyword…"
+                    autocomplete="off"
+                    spellcheck="false"
+                  >
+                  <label class="pages-sr-only" for="pages-category">Category</label>
+                  <select id="pages-category" class="pages-category" data-pages-category aria-label="Category"></select>
+                  <span class="pages-count" data-pages-count aria-live="polite"></span>
+                </div>
+
+                <nav class="pages-az" data-pages-az aria-label="Jump to letter"></nav>
+
+                <div class="pages-book">
+                  <div class="pages-results" data-pages-results aria-label="Directory listings"></div>
+                  <p class="pages-empty" data-pages-empty hidden>No listings match. Try another category or keyword.</p>
+                </div>
+
+                <p class="pages-footer-note">Powered by demo listings · Google local coming</p>
+              </div>
             </div>
+
             <div role="tabpanel" id="panel-jobs" aria-labelledby="tab-jobs" hidden>
               <div class="wm-empty-panel" data-empty-panel="jobs" aria-hidden="true"></div>
             </div>
@@ -290,5 +501,8 @@
   <script src="js/main.js" defer></script>
   <script src="js/login-signup-shell.js" defer></script>
   <script src="js/login.js" defer></script>
+  <script src="js/well.js" defer></script>
+  <script src="js/well-auth.js" defer></script>
+  <script src="js/pages.js" defer></script>
 </body>
 </html>
