@@ -136,7 +136,7 @@
       externalCard(
         "indeed",
         "Search Indeed near " + loc,
-        "Not live · deeplink only. Opens Indeed job search for “" +
+        "Local demo · deeplink only. Opens Indeed job search for “" +
           q +
           "” in " +
           loc +
@@ -167,7 +167,7 @@
       externalCard(
         "linkedin",
         "Search LinkedIn near " + loc,
-        "Not live · deeplink only. Opens LinkedIn job search for “" +
+        "Local demo · deeplink only. Opens LinkedIn job search for “" +
           q +
           "” in " +
           loc +

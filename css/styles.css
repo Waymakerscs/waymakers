@@ -7137,8 +7137,28 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 .login-demo-hint[hidden],
 .well-auth-form[hidden],
 .well-auth-offline[hidden],
-.well-auth-demo-chrome[hidden] {
+.well-auth-demo-chrome[hidden],
+.well-auth-steps[hidden],
+.app-demo-banner[hidden] {
   display: none !important;
+}
+.login-demo-unlock-row {
+  margin: 0.75rem 0 0;
+  text-align: center;
+}
+.login-demo-unlock-note {
+  margin: 0.45rem 0 0;
+  text-align: center;
+}
+.app-demo-banner {
+  margin: 0;
+  padding: 0.55rem 1rem;
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  background: #fff4e6;
+  color: #5a3a12;
+  border-bottom: 1px solid #e8d4b8;
 }
 body.login-gate-open {
   overflow: hidden;

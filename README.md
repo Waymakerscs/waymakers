@@ -93,7 +93,7 @@ Jobs / Pages / Cognation are untouched.
 
 - Project ref: `gjrxweezprhiosqewiah` (org COG-NATION) — **separate from Cognation**
 - Browser config: `js/cognation-config.js` → `https://gjrxweezprhiosqewiah.supabase.co`
-- WELL is a demo EHR step-up gated by the non-secret flag `WAYMAKERSConfig.well.demoUnlock` in `js/cognation-config.js`. No demo password or OTP ships in static assets. Not production auth, not HIPAA; PHI must not leave the browser.
+- Local demo unlock is `?demo=1` or **Demo unlock**, stored in sessionStorage `waymakers.demo.unlock.v1`. No demo password or fixed OTP ships in static assets. After that unlock, WELL creates a one-time code in the browser. Not production auth, not HIPAA; PHI must not leave the browser.
 
 ## Related
 

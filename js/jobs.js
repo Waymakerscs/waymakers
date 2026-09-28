@@ -251,7 +251,7 @@
           '<span class="jobs-chip jobs-chip--external">External</span>' +
           '<span class="jobs-chip jobs-chip--deferred">Deeplink only · not live</span>';
       } else {
-        chips += '<span class="jobs-chip jobs-chip--deferred">Not live</span>';
+        chips += '<span class="jobs-chip jobs-chip--deferred">Local demo</span>';
       }
 
       var actions;
@@ -269,7 +269,7 @@
           '<div class="jobs-card-actions">' +
           '<button type="button" class="jobs-apply-btn" data-jobs-apply="' +
           escapeHtml(job.id) +
-          '">Apply (not live)</button>' +
+          '">Apply (local demo)</button>' +
           "</div>";
       }
 

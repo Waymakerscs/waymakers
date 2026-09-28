@@ -225,12 +225,22 @@
             Need an account? Sign up
           </button>
         </p>
+        <p class="login-demo-unlock-row">
+          <button type="button" class="btn btn-secondary login-demo-unlock" data-demo-unlock>Demo unlock</button>
+        </p>
+        <p class="form-hint login-demo-unlock-note">
+          Local demo — not production auth. No password is shipped. A WELL code is created in this browser after unlock.
+        </p>
         <p class="form-hint login-demo-hint" data-login-demo-hint hidden>Sign in with the email and password you used to create your WAYMAKERS account.</p>
         <p class="form-hint login-demo-storage-hint">Your account is secured by WAYMAKERS sign-in.</p>
       </form>
       </div>
     </div>
   </div>
+
+  <p class="app-demo-banner" data-demo-banner hidden role="note">
+    Local demo — not production auth / not HIPAA. This tab is not a production account. PHI must not leave the browser.
+  </p>
 
   <!-- Cognation-style masthead: wordmark + tagline only (silver holo / black glow). -->
   <section class="waymakers-masthead" aria-label="Waymakers">
@@ -303,7 +313,7 @@
                     </div>
                   </div>
                   <p class="well-disclaimer" role="note">
-                    Demo — not production auth / not HIPAA. Not a real EHR · not a production clinical system · PHI must not leave the browser.
+                    Local demo — not production auth / not HIPAA. Not a real EHR · not a production clinical system · PHI must not leave the browser.
                   </p>
                 </header>
 
@@ -328,9 +338,14 @@
                       Separate from WAYMAKERS site sign-in. This lock is not clinical authentication.
                     </p>
 
-                    <div class="well-auth-demo-chrome" data-well-demo-chrome role="note">
-                      <strong>Demo — not production auth / not HIPAA.</strong>
-                      Demo EHR only. Not a production clinical system. PHI must not leave this browser.
+                    <div class="well-auth-demo-chrome" data-well-demo-chrome role="note" hidden>
+                      <strong>Local demo — not production auth / not HIPAA.</strong>
+                      Demo EHR only. PHI must not leave this browser. The one-time code is created here after demo unlock. It is not shipped with the site.
+                    </div>
+
+                    <div class="well-auth-steps" data-well-auth-steps hidden>
+                      <span class="well-auth-step is-active" data-well-auth-step-indicator="1">1 · Name</span>
+                      <span class="well-auth-step" data-well-auth-step-indicator="2">2 · Code</span>
                     </div>
 
                     <form
@@ -340,9 +355,10 @@
                       method="post"
                       novalidate
                       autocomplete="off"
+                      hidden
                     >
                       <div class="form-group">
-                        <label for="well-auth-username">Display name for this demo session</label>
+                        <label for="well-auth-username">Display name for this local demo</label>
                         <input
                           type="text"
                           id="well-auth-username"
@@ -356,15 +372,51 @@
                       </div>
                       <p class="well-auth-status" data-well-auth-status="credentials" hidden role="status" aria-live="polite"></p>
                       <div class="form-actions well-auth-actions">
-                        <button type="submit" class="btn btn-primary well-auth-submit">Unlock demo chart</button>
+                        <button type="submit" class="btn btn-primary well-auth-submit">Continue</button>
                       </div>
                       <p class="form-hint well-auth-hint">
-                        No password or one-time code ships with this site. This only opens the local demo chart.
+                        No password ships with this site. Continue to create a one-time code in this browser.
                       </p>
                     </form>
 
-                    <p class="well-auth-offline" data-well-auth-offline hidden role="status">
-                      WELL clinical sign-in is not live. No production identity provider is connected.
+                    <form
+                      class="well-auth-form"
+                      data-well-auth-form="otp"
+                      action="#"
+                      method="post"
+                      novalidate
+                      autocomplete="off"
+                      hidden
+                    >
+                      <div class="well-auth-demo-code" data-well-auth-demo-code role="note">
+                        <span class="well-auth-demo-label">Local demo code</span>
+                        <strong class="well-auth-demo-value">Created in this browser: <code data-well-auth-code-display>————</code></strong>
+                        <span class="well-auth-demo-note">Not sent by SMS. Not stored as a site password.</span>
+                      </div>
+                      <div class="form-group">
+                        <label for="well-auth-otp">6-digit verification code</label>
+                        <input
+                          type="text"
+                          id="well-auth-otp"
+                          name="wellOtp"
+                          inputmode="numeric"
+                          pattern="[0-9]{6}"
+                          maxlength="6"
+                          autocomplete="one-time-code"
+                          required
+                          placeholder="Code shown above"
+                          spellcheck="false"
+                        >
+                      </div>
+                      <p class="well-auth-status" data-well-auth-status="otp" hidden role="status" aria-live="polite"></p>
+                      <div class="form-actions well-auth-actions">
+                        <button type="button" class="btn btn-secondary" data-well-auth-back>Back</button>
+                        <button type="submit" class="btn btn-primary well-auth-submit">Unlock demo chart</button>
+                      </div>
+                    </form>
+
+                    <p class="well-auth-offline" data-well-auth-offline role="status">
+                      WELL clinical sign-in is not live. Use Demo unlock or <code>?demo=1</code> for a local demo. No production identity provider is connected.
                     </p>
                   </div>
                 </div>
@@ -447,7 +499,7 @@
                   <p class="jobs-dek">Applicant board · local company openings plus Indeed / LinkedIn by location</p>
                   <p class="jobs-role-note">Companies manage care work in WELL; openings to apply for are listed here.</p>
                   <p class="jobs-deferral" role="note">
-                    Not live. Waymakers Apply does not submit applications. Indeed and LinkedIn cards are deeplink only — the jobs API is not a live listings feed.
+                    Local demo. Waymakers Apply does not submit applications. Indeed and LinkedIn cards are deeplink only — the jobs API is not a live listings feed.
                   </p>
                 </header>
 

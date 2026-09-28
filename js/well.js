@@ -1265,9 +1265,9 @@
 
     return (
       '<div class="well-doc-form well-ah-panel" data-well-doc="applehealth">' +
-      '<p class="well-doc-lead">Share Apple Health data with your WELL care team. <strong>Manual export only.</strong></p>' +
+      '<p class="well-doc-lead">Share Apple Health data with your WELL care team. <strong>Local demo · manual export only.</strong></p>' +
       '<div class="well-ah-honest" role="note">' +
-      "<strong>Manual export only.</strong> This web portal does <em>not</em> do live HealthKit sync. " +
+      "<strong>Manual export only.</strong> Local demo — this web portal does <em>not</em> do live HealthKit sync. " +
       "Continuous / background HealthKit access needs a native iOS app later. " +
       "Today you can grant permission and upload an Apple Health export file." +
       "</div>" +

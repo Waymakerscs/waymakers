@@ -31,17 +31,6 @@
         enabled: false,
       },
     },
-
-    /**
-     * WELL demo step-up. Non-secret flag — not a password and not an OTP.
-     * true: the visitor may open the local demo chart after acknowledging
-     *       it is not production auth and not HIPAA.
-     * false: the chart stays locked (clinical sign-in is not live).
-     * No demo password or one-time code is shipped in static assets.
-     */
-    well: {
-      demoUnlock: true,
-    },
   });
   window.WAYMAKERSConfig = next;
   // Keep CognationConfig alias so older client modules keep working.
