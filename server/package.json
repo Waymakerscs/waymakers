@@ -1,0 +1,17 @@
+{
+  "name": "cognation-session-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "In-memory session + screen-break service for the COGNATION static site ($0 deploy)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
