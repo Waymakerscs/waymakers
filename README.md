@@ -41,3 +41,13 @@ npx --yes serve -l 4173 .
 ## Cloudflare Pages (optional)
 
 Empty project `waymakers` → https://waymakers.pages.dev can be deployed from this repo when ready. Do not point production Cognation at this tree.
+
+
+## Auth (WAYMAKERS Supabase)
+
+- Project ref: `gjrxweezprhiosqewiah` (org COG-NATION) — **separate from Cognation**
+- Browser config: `js/cognation-config.js` → `https://gjrxweezprhiosqewiah.supabase.co`
+- Sign-in / sign-up UI branded **WAYMAKERS** with tagline “A wellness concierge” (above the title)
+- Inverse theme: glowing black lettering on silvery holographic backgrounds (login, Well, Pages)
+- Cognation production (`cognation-3md.pages.dev` / Cognation repos) is untouched
+

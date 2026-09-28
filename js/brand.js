@@ -6,8 +6,8 @@
 (function () {
   "use strict";
 
-  var SITE_BRAND = "COGNATION";
-  var SITE_TAGLINE = "Build clarity. Ship faster.";
+  var SITE_BRAND = "WAYMAKERS";
+  var SITE_TAGLINE = "“A wellness concierge”";
 
   window.SITE_BRAND = SITE_BRAND;
   window.SITE_TAGLINE = SITE_TAGLINE;
