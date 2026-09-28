@@ -34,7 +34,9 @@ var mayaConnected = openings();
 assert.strictEqual(mayaConnected.slots[0].time, "09:30", "Maya huddle holds 9:00 when Teams is connected");
 assert.strictEqual(mayaConnected.slots[0].dateIso, "2026-09-28");
 assert.strictEqual(mayaConnected.held[0].time, "09:00");
-assert.ok(/Clinic huddle/.test(mayaConnected.held[0].detail));
+assert.strictEqual(mayaConnected.held[0].title, "Clinic huddle");
+assert.ok(/Clinic huddle/.test(cc.presentForRole(mayaConnected.held[0], "provider", "held").title));
+assert.strictEqual(cc.presentForRole(mayaConnected.held[0], "patient", "held").title, "");
 assert.strictEqual(mayaConnected.held[0].source, "teams");
 assert.ok(mayaConnected.slots.length <= 5);
 
@@ -69,8 +71,20 @@ assert.ok(
   }),
   "patient standup and grand rounds are not offered"
 );
-assert.ok(tuesday.held.some(function (h) { return h.time === "10:00" && /Work standup/.test(h.detail); }));
-assert.ok(tuesday.held.some(function (h) { return h.time === "11:00" && /Grand rounds/.test(h.detail); }));
+assert.ok(tuesday.held.some(function (h) {
+  return h.time === "10:00" && /Work standup/.test(cc.presentForRole(h, "patient", "held").title);
+}));
+assert.ok(tuesday.held.some(function (h) {
+  var hidden = cc.presentForRole(h, "provider", "held");
+  return h.time === "10:00" && hidden.title === "" && JSON.stringify(hidden).indexOf("standup") < 0;
+}));
+assert.ok(tuesday.held.some(function (h) {
+  var hidden = cc.presentForRole(h, "patient", "held");
+  return h.time === "11:00" && hidden.title === "" && JSON.stringify(hidden).indexOf("Grand") < 0;
+}));
+assert.ok(tuesday.held.some(function (h) {
+  return h.time === "11:00" && /Grand rounds/.test(cc.presentForRole(h, "provider", "held").title);
+}));
 
 var tuesdayOtherPatient = openings({
   now: new Date(2026, 8, 29, 8, 0, 0),
@@ -96,7 +110,11 @@ var jamesAfternoon = cc.searchOpenings({
   count: 5,
 });
 assert.strictEqual(jamesAfternoon.slots[0].time, "15:00");
-assert.ok(jamesAfternoon.held.some(function (h) { return /Procedure block/.test(h.detail); }));
+assert.ok(jamesAfternoon.held.some(function (h) { return h.title === "Procedure block" && h.employeeId === "emp-james"; }));
+assert.ok(jamesAfternoon.held.every(function (h) {
+  var view = cc.presentForRole(h, "provider", "held");
+  return view.title === "" && JSON.stringify(view).indexOf("Procedure") < 0;
+}));
 
 assert.deepEqual(cc.slotStarts("2026-09-27"), [], "Sunday is closed");
 assert.strictEqual(cc.slotStarts("2026-09-28").length, 13);
@@ -278,11 +296,23 @@ var patientHeld = cc.presentForRole(
   "patient",
   "held"
 );
-assert.strictEqual(patientHeld.label, "Unavailable");
-assert.strictEqual(patientHeld.title, "");
+assert.strictEqual(patientHeld.owned, true);
+assert.strictEqual(patientHeld.state, "own");
 assert.strictEqual(patientHeld.who, "You");
-assert.ok(JSON.stringify(patientHeld).indexOf("standup") < 0);
-assert.ok(JSON.stringify(patientHeld).indexOf("labs") < 0);
+assert.ok(patientHeld.title.indexOf("Work standup") >= 0, "patient owns their Outlook title");
+assert.ok(patientHeld.label.indexOf("bring labs") >= 0);
+assert.strictEqual(patientHeld.sourceLabel, "Outlook");
+
+var providerSeesPatientOutlook = cc.presentForRole(
+  { kind: "outlook-self", title: "Work standup — bring labs", source: "outlook", employeeId: "self-patient" },
+  "provider",
+  "held"
+);
+assert.strictEqual(providerSeesPatientOutlook.owned, false);
+assert.strictEqual(providerSeesPatientOutlook.label, "Unavailable");
+assert.strictEqual(providerSeesPatientOutlook.title, "");
+assert.ok(JSON.stringify(providerSeesPatientOutlook).indexOf("standup") < 0);
+assert.ok(JSON.stringify(providerSeesPatientOutlook).indexOf("labs") < 0);
 
 var otherPatient = cc.presentForRole(
   { kind: "appointment", title: "HTN follow-up", source: "well", employeeId: "emp-maya", patientName: "Jordan Rivera" },
@@ -290,8 +320,28 @@ var otherPatient = cc.presentForRole(
   "board"
 );
 assert.strictEqual(otherPatient.label, "Busy");
+assert.strictEqual(otherPatient.title, "");
 assert.ok(JSON.stringify(otherPatient).indexOf("Jordan") < 0);
 assert.ok(JSON.stringify(otherPatient).indexOf("HTN") < 0);
+
+var providerOtherPatient = cc.presentForRole(
+  {
+    kind: "appointment",
+    title: "HTN follow-up",
+    source: "well",
+    employeeId: "emp-maya",
+    patientName: "Jordan Rivera",
+    notes: "diabetes plan",
+  },
+  "provider",
+  "board"
+);
+assert.strictEqual(providerOtherPatient.owned, false);
+assert.strictEqual(providerOtherPatient.label, "Busy");
+assert.strictEqual(providerOtherPatient.title, "");
+assert.ok(JSON.stringify(providerOtherPatient).indexOf("Jordan") < 0, "overlay leaked a patient");
+assert.ok(JSON.stringify(providerOtherPatient).indexOf("HTN") < 0, "overlay leaked a reason");
+assert.ok(JSON.stringify(providerOtherPatient).indexOf("diabetes") < 0);
 
 var ownVisit = cc.presentForRole(
   { kind: "own-visit", title: "Annual wellness", source: "well" },
@@ -299,15 +349,62 @@ var ownVisit = cc.presentForRole(
   "held"
 );
 assert.strictEqual(ownVisit.state, "own");
+assert.strictEqual(ownVisit.owned, true);
 assert.strictEqual(ownVisit.label, "Annual wellness");
+
+var providerSeesOwnVisit = cc.presentForRole(
+  { kind: "own-visit", title: "Annual wellness", source: "well" },
+  "provider",
+  "held"
+);
+assert.strictEqual(providerSeesOwnVisit.label, "Unavailable");
+assert.strictEqual(providerSeesOwnVisit.title, "");
+assert.ok(JSON.stringify(providerSeesOwnVisit).indexOf("Annual") < 0);
 
 var providerFull = cc.presentForRole(
   { kind: "employee", title: secretTitle, source: "teams", employeeId: "emp-maya" },
   "provider",
   "board"
 );
-assert.ok(providerFull.title.indexOf("Jordan Rivera") >= 0, "provider should keep the subject");
+assert.strictEqual(providerFull.owned, true);
+assert.strictEqual(providerFull.who, "You");
+assert.ok(providerFull.title.indexOf("Jordan Rivera") >= 0, "owner keeps their own subject");
 assert.ok(providerFull.label.indexOf("Grand rounds") >= 0);
 assert.strictEqual(providerFull.sourceLabel, "Teams");
+
+var providerNina = cc.presentForRole(
+  { kind: "employee", title: "Procedure block for Sam Okonkwo", source: "teams", employeeId: "emp-nina" },
+  "provider",
+  "board"
+);
+assert.strictEqual(providerNina.owned, false);
+assert.strictEqual(providerNina.label, "Busy");
+assert.strictEqual(providerNina.title, "");
+assert.strictEqual(providerNina.who, "Nina");
+assert.strictEqual(providerNina.sourceLabel, "");
+assert.ok(JSON.stringify(providerNina).indexOf("Sam") < 0);
+assert.ok(JSON.stringify(providerNina).indexOf("Procedure") < 0);
+assert.ok(JSON.stringify(providerNina).indexOf("Okonkwo") < 0);
+
+var mondayHeld = cc.searchOpenings({
+  now: new Date(2026, 8, 28, 8, 0),
+  clinicianId: "emp-maya",
+  appointments: [],
+  connected: true,
+  includePatientOutlook: false,
+  count: 3,
+  heldCap: 3,
+});
+assert.ok(mondayHeld.held.length > 0, "Maya Monday has a hold");
+mondayHeld.held.forEach(function (h) {
+  var masked = cc.presentForRole(h, "patient", "held");
+  assert.strictEqual(masked.title, "");
+  assert.strictEqual(masked.label, "Unavailable");
+  assert.ok(JSON.stringify(masked).indexOf("huddle") < 0);
+  assert.ok(JSON.stringify(masked).indexOf("Clinic") < 0);
+});
+var mayaOwnedHold = cc.presentForRole(mondayHeld.held[0], "provider", "held");
+assert.strictEqual(mayaOwnedHold.owned, true);
+assert.ok(mayaOwnedHold.title.indexOf("Clinic huddle") >= 0);
 
 console.log("well-calendar-connect: " + "ok");

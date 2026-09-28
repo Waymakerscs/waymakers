@@ -18,9 +18,10 @@
  *   Outlook/Teams busy + first-available slots). Connection and visible-employee
  *   picks live in this same portal store. No live Graph OAuth.
  *
- *   Privacy boundary: patient calendar HTML is built only from
- *   WellCalendarConnect.presentForRole(..., "patient"). That view is busy/free
- *   (and the patient's own visits). Provider HTML may show full events.
+ *   Privacy boundary: shared calendar overlays on both portals are built only
+ *   from WellCalendarConnect.presentForRole. That view is Busy/Free unless the
+ *   signed-in person owns the event. Clinic patient names stay in a separate
+ *   provider-only schedule list, never on the shared overlay.
  *
  * Demo only — not a real EHR. Do not claim HIPAA compliance.
  */
@@ -450,56 +451,6 @@
       '<div class="well-cal-grid" role="grid" aria-label="Schedule calendar">' +
       cells.join("") +
       "</div></div>"
-    );
-  }
-
-  function renderDayAppointmentsList(data, dateIso) {
-    var list = appointmentsForDate(data, dateIso);
-    if (!list.length) {
-      return '<p class="well-muted well-tiny">No appointments on this day.</p>';
-    }
-    return (
-      '<ul class="well-roster" role="list">' +
-      list
-        .map(function (a) {
-          var p = parseWhen(a.when);
-          var on = a.patientId && a.patientId === data.prefs.selectedRosterId;
-          return (
-            "<li>" +
-            '<div class="well-appt-row' +
-            (on ? " is-selected" : "") +
-            '">' +
-            (a.patientId
-              ? '<button type="button" class="well-roster-btn well-appt-open" data-well-roster="' +
-                escapeHtml(a.patientId) +
-                '" aria-pressed="' +
-                (on ? "true" : "false") +
-                '"><span class="well-roster-time">' +
-                escapeHtml(p.time || "—") +
-                '</span><span class="well-roster-name">' +
-                escapeHtml(a.patientName || "Patient") +
-                '</span><span class="well-muted">' +
-                escapeHtml(a.reason || "") +
-                "</span></button>"
-              : '<div class="well-roster-btn" tabindex="-1"><span class="well-roster-time">' +
-                escapeHtml(p.time || "—") +
-                '</span><span class="well-roster-name">' +
-                escapeHtml(a.patientName || "Patient") +
-                '</span><span class="well-muted">' +
-                escapeHtml(a.reason || "") +
-                "</span></div>") +
-            '<button type="button" class="well-icon-btn well-appt-cancel" data-well-appt-cancel="' +
-            escapeHtml(a.id || "") +
-            '" aria-label="Cancel appointment for ' +
-            escapeHtml(a.patientName || "patient") +
-            ' at ' +
-            escapeHtml(p.time || "") +
-            '">×</button>' +
-            "</div></li>"
-          );
-        })
-        .join("") +
-      "</ul>"
     );
   }
 
@@ -2509,20 +2460,20 @@
 
   /**
    * Privacy boundary for shared-calendar chrome.
-   * Patient markup may include only presentForRole() fields (Busy / Unavailable,
-   * or the patient's own visit text). Provider markup may include subjects.
+   * Pills and held rows print only presentForRole() fields. Owned events keep
+   * their title. Every other calendar is Busy / Unavailable.
    */
   function renderBusyPill(view, color) {
-    var shown = view.role === "provider" ? view.title || view.label : view.label;
+    var shown = view.owned ? view.title || view.label : view.label;
     var who = view.who
       ? '<span class="well-busy-who">' + escapeHtml(view.who) + "</span>"
       : "";
     var src =
-      view.role === "provider" && view.sourceLabel
+      view.owned && view.sourceLabel
         ? '<span class="well-src-tag">' + escapeHtml(view.sourceLabel) + "</span>"
         : "";
-    var privateCls = view.role === "patient" ? " well-busy-pill--private" : "";
-    var selfCls = view.who === "You" ? " well-busy-pill--self" : "";
+    var privateCls = view.owned ? "" : " well-busy-pill--private";
+    var selfCls = view.owned ? " well-busy-pill--self" : "";
     return (
       '<span class="well-busy-pill' +
       privateCls +
@@ -2546,20 +2497,17 @@
     var view = CC.presentForRole(
       {
         kind: held.kind,
-        title: held.kind === "own-visit" ? held.title || held.detail : held.title,
+        title: held.title,
         source: held.source,
         employeeId: held.employeeId,
       },
       side === "provider" ? "provider" : "patient",
       "held"
     );
-    var who =
-      view.role === "patient" && view.who
-        ? escapeHtml(view.who) + " · "
-        : "";
-    var text = view.role === "provider" ? view.label : view.label;
+    var who = view.who ? escapeHtml(view.who) + " · " : "";
+    var text = view.owned ? view.title || view.label : view.label;
     var src =
-      view.role === "provider" && view.sourceLabel
+      view.owned && view.sourceLabel
         ? ' <span class="well-src-tag">' + escapeHtml(view.sourceLabel) + "</span>"
         : "";
     return (
@@ -2624,22 +2572,41 @@
     );
   }
 
+  function renderClinicSchedule(data, dateIso) {
+    var list = appointmentsForDate(data, dateIso);
+    var body = list.length
+      ? '<div class="well-roster">' +
+        list
+          .map(function (a) {
+            return renderProviderApptRow(data, a);
+          })
+          .join("") +
+        "</div>"
+      : '<p class="well-muted well-tiny">No clinic visits on this day.</p>';
+    return (
+      '<div class="well-clinic-schedule" data-well-clinic-schedule>' +
+      '<h5 class="well-cal-day-heading">Clinic schedule · provider only</h5>' +
+      '<p class="well-privacy-note">Patient names and visit reasons stay in this list. They are not on the shared calendar overlay.</p>' +
+      body +
+      "</div>"
+    );
+  }
+
   function renderDayBoard(data, dateIso, side) {
     var CC = window.WellCalendarConnect;
-    if (!CC) {
-      return side === "provider" ? renderDayAppointmentsList(data, dateIso) : "";
-    }
+    if (!CC) return "";
     var cc = CC.normalize(data.calendarConnect);
     var starts = CC.slotStarts(dateIso).slice();
     var appts = appointmentsForDate(data, dateIso);
     var times = starts.slice();
-    appts.forEach(function (a) {
-      var showRow = side === "provider" || patientOwnsAppt(data, a);
-      if (!showRow) return;
-      var iv = CC.appointmentInterval(a);
-      if (!iv || times.indexOf(iv.start) >= 0) return;
-      times.push(iv.start);
-    });
+    if (side === "patient") {
+      appts.forEach(function (a) {
+        if (!patientOwnsAppt(data, a)) return;
+        var iv = CC.appointmentInterval(a);
+        if (!iv || times.indexOf(iv.start) >= 0) return;
+        times.push(iv.start);
+      });
+    }
     times.sort(function (a, b) {
       return a - b;
     });
@@ -2691,32 +2658,23 @@
         appts.forEach(function (a) {
           var iv = CC.appointmentInterval(a);
           if (!iv || !CC.overlaps(startMin, end, iv.start, iv.end)) return;
-          if (side === "patient") {
-            if (patientOwnsAppt(data, a)) {
-              if (iv.start === startMin) apptHtml += renderOwnApptChip(a);
-              else clinicBooked = true;
-            } else {
-              clinicBooked = true;
-            }
-          } else if (iv.start === startMin) {
-            apptHtml += renderProviderApptRow(data, a);
+          if (side === "patient" && patientOwnsAppt(data, a) && iv.start === startMin) {
+            apptHtml += renderOwnApptChip(a);
           } else {
             clinicBooked = true;
           }
         });
         if (clinicBooked) {
-          if (side === "provider") {
-            pills.unshift(
-              '<span class="well-busy-pill well-busy-pill--clinic"><span class="well-busy-who">Schedule</span><span class="well-busy-title">Overlaps a visit</span></span>'
-            );
-          } else {
-            pills.unshift(
-              renderBusyPill(
-                CC.presentForRole({ kind: "appointment", title: "", source: "well" }, "patient", "board"),
-                "#8a96a3"
-              )
-            );
-          }
+          pills.unshift(
+            renderBusyPill(
+              CC.presentForRole(
+                { kind: "appointment", title: "", source: "well" },
+                side === "provider" ? "provider" : "patient",
+                "board"
+              ),
+              "#8a96a3"
+            )
+          );
         }
         var open = !apptHtml && !pills.length;
         var body = open ? '<span class="well-slot-open">Open</span>' : apptHtml + pills.join("");
@@ -3080,7 +3038,7 @@
       '<section class="well-rail-card well-rail-card--schedule" data-well-schedule-card>' +
       "<h4>Schedule</h4>" +
       '<p class="well-muted well-tiny">Shared clinic calendar · book the next open visit with your doctor.</p>' +
-      '<p class="well-privacy-note">Private busy/free on this side. Other patients, visit reasons, and Outlook/Teams subjects stay hidden. Your own visits still show in full.</p>' +
+      '<p class="well-privacy-note">Shared overlay is Busy / Free except your own calendar. Other people\u2019s titles, names, reasons, and notes stay hidden. Your visits and your Outlook events show in full.</p>' +
       renderTeamsConnect(data, "patient") +
       renderMonthCalendar(data, { side: "patient" }) +
       '<div class="well-cal-daypanel">' +
@@ -3270,15 +3228,16 @@
       '<section class="well-rail-card well-rail-card--calendar well-rail-card--schedule" data-well-schedule-card>' +
       "<h4>Team schedule</h4>" +
       '<p class="well-muted well-tiny">Shared employee calendars · suggest the next open visit, or add one yourself.</p>' +
+      '<p class="well-privacy-note">Shared overlay is Busy / Free except your own calendar. Other employees\u2019 subjects stay hidden. Patient names are only in the clinic schedule under the board.</p>' +
       renderTeamsConnect(data, "provider") +
       renderMonthCalendar(data, { side: "provider" }) +
       '<div class="well-cal-daypanel">' +
       '<h5 class="well-cal-day-heading">Day board · ' +
       escapeHtml(dayLabel) +
       "</h5>" +
-      '<div data-well-day-appts>' +
       dayListHtml +
-      "</div></div>" +
+      "</div>" +
+      renderClinicSchedule(data, selectedDate) +
       '<div class="well-cal-add">' +
       "<h5 class=\"well-cal-day-heading\">Suggest first available · add appointment</h5>" +
       renderScheduleForm(data, selectedDate) +

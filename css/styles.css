@@ -7017,10 +7017,18 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 
 .well-cal-daypanel,
-.well-cal-add {
+.well-cal-add,
+.well-clinic-schedule {
   margin-top: 0.65rem;
   padding-top: 0.55rem;
   border-top: 1px solid #e8eef1;
+}
+
+.well-clinic-schedule {
+  background: #f7fafb;
+  border: 1px solid var(--well-line);
+  border-radius: 8px;
+  padding: 0.55rem 0.6rem 0.35rem;
 }
 
 .well-cal-day-heading {

@@ -19,10 +19,14 @@
  * doctor's meetings when the clinic calendar is connected.
  *
  * Privacy boundary: presentForRole(block, role, surface).
- *   provider — full subject, source, and description (clinic operations).
- *   patient  — free/busy only. No subjects, attendees, notes, other patients'
- *              names, reasons, or MRNs. Own WELL visits may keep their own detail.
- * The demo is not HIPAA-certified. The patient view is still masked this way.
+ *   Shared overlays are opaque Busy / Free for every calendar the viewer does
+ *   not own — patients and employees alike. No subjects, attendees, notes,
+ *   other patients' names, reasons, or MRNs.
+ *   Full detail is owner-only. The patient owns their WELL visits and their
+ *   own Outlook calendar. The signed-in provider (demo: Dr. Maya Chen) owns
+ *   only that employee's Outlook/Teams events. Clinic names for workflow live
+ *   outside this adapter, in a provider-only schedule list.
+ * The demo is not HIPAA-certified. The mask is still applied this way.
  */
 (function (root) {
   "use strict";
@@ -500,55 +504,61 @@
   var PATIENT_BUSY_LABEL = "Busy";
   var PATIENT_UNAVAILABLE_LABEL = "Unavailable";
 
-  function blockWho(block) {
-    if (!block) return "";
-    if (block.kind === "outlook-self" || block.employeeId === PATIENT_CAL_ID) return "You";
-    if (block.kind === "own-visit") return "You";
-    if (block.employeeId) {
-      var emp = staffById(block.employeeId);
-      if (emp) return emp.short;
+  /**
+   * Who may see this block's title.
+   * Patient: own WELL visit, or their own Outlook/Teams calendar.
+   * Provider: only the signed-in employee's mailbox (demo: Dr. Maya Chen).
+   * Everyone else's calendars stay opaque, including other staff and other patients.
+   */
+  function viewerOwns(block, role) {
+    block = block || {};
+    if (role === "patient") {
+      return (
+        block.kind === "own-visit" ||
+        block.kind === "outlook-self" ||
+        block.employeeId === PATIENT_CAL_ID
+      );
     }
-    return "";
+    if (role === "provider") {
+      return block.kind === "employee" && block.employeeId === DEFAULT_CLINICIAN_ID;
+    }
+    return false;
   }
 
   /**
    * Single display gate for shared-calendar UI.
-   * Patient results never copy title, notes, attendees, or other patients' fields
-   * except an own WELL visit (kind "own-visit"), which may keep that visit's own text.
-   * surface "held" uses "Unavailable"; the day board uses "Busy".
+   * Results are a whitelist: label, title, who, source. Notes, attendees, and
+   * patient fields on the input block are never copied.
+   * Owned blocks keep their own title. Every other block is Busy (day board)
+   * or Unavailable (held slot), with a staff short name only when the block
+   * is someone else's employee calendar.
    */
   function presentForRole(block, role, surface) {
     block = block || {};
-    var provider = role === "provider";
-    if (provider) {
+    var roleName = role === "provider" ? "provider" : "patient";
+    var opaque = surface === "held" ? PATIENT_UNAVAILABLE_LABEL : PATIENT_BUSY_LABEL;
+    if (viewerOwns(block, roleName)) {
+      var ownLabel = block.title || (roleName === "patient" ? "Your visit" : "Busy");
+      var showSource = block.kind === "own-visit" ? "" : block.source || "";
       return {
-        role: "provider",
-        state: block.kind === "own-visit" ? "own" : "busy",
-        label: describeBlock(block),
-        title: block.title || "",
-        who: blockWho(block),
-        source: block.source || "",
-        sourceLabel: sourceLabel(block.source),
-      };
-    }
-    if (block.kind === "own-visit") {
-      var ownLabel = block.title || "Your visit";
-      return {
-        role: "patient",
+        role: roleName,
+        owned: true,
         state: "own",
         label: ownLabel,
         title: ownLabel,
         who: "You",
-        source: "",
-        sourceLabel: "",
+        source: showSource,
+        sourceLabel: sourceLabel(showSource),
       };
     }
-    var opaque = surface === "held" ? PATIENT_UNAVAILABLE_LABEL : PATIENT_BUSY_LABEL;
     var who = "";
-    if (block.kind === "outlook-self" || block.employeeId === PATIENT_CAL_ID) who = "You";
-    else if (block.employeeId && staffById(block.employeeId)) who = staffById(block.employeeId).short;
+    if (block.kind === "employee" && block.employeeId) {
+      var emp = staffById(block.employeeId);
+      if (emp) who = emp.short;
+    }
     return {
-      role: "patient",
+      role: roleName,
+      owned: false,
       state: "busy",
       label: opaque,
       title: "",
@@ -595,7 +605,6 @@
               dateIso: iso,
               time: timeHeld,
               label: formatWhen(iso, timeHeld),
-              detail: describeBlock(reason),
               title: reason.title || "",
               employeeId: reason.employeeId || "",
               source: reason.source || "",
@@ -658,6 +667,7 @@
     sourceLabel: sourceLabel,
     PATIENT_BUSY_LABEL: PATIENT_BUSY_LABEL,
     PATIENT_UNAVAILABLE_LABEL: PATIENT_UNAVAILABLE_LABEL,
+    viewerOwns: viewerOwns,
     presentForRole: presentForRole,
     searchOpenings: searchOpenings,
     useAdapter: useAdapter,
