@@ -225,12 +225,22 @@
             Need an account? Sign up
           </button>
         </p>
+        <p class="login-demo-unlock-row">
+          <button type="button" class="btn btn-secondary login-demo-unlock" data-demo-unlock>Demo unlock</button>
+        </p>
+        <p class="form-hint login-demo-unlock-note">
+          Local demo — not production auth. No password is shipped. A WELL code is created in this browser after unlock.
+        </p>
         <p class="form-hint login-demo-hint" data-login-demo-hint hidden>Sign in with the email and password you used to create your WAYMAKERS account.</p>
         <p class="form-hint login-demo-storage-hint">Your account is secured by WAYMAKERS sign-in.</p>
       </form>
       </div>
     </div>
   </div>
+
+  <p class="app-demo-banner" data-demo-banner hidden role="note">
+    Local demo — not production auth / not HIPAA. This tab is not a production account. PHI must not leave the browser.
+  </p>
 
   <!-- Cognation-style masthead: wordmark + tagline only (silver holo / black glow). -->
   <section class="waymakers-masthead" aria-label="Waymakers">
@@ -267,9 +277,9 @@
                     </div>
                     <div class="well-chrome-end">
                       <div class="well-session-bar" data-well-session-bar hidden>
-                        <span class="well-session-chip" data-well-session-chip title="Session ends when this tab closes">
+                        <span class="well-session-chip" data-well-session-chip title="Demo session only. Ends when this tab closes. Not production auth.">
                           <span class="well-session-dot" aria-hidden="true"></span>
-                          WELL locked session
+                          Demo session · not production auth
                         </span>
                         <button type="button" class="well-lock-btn" data-well-lock-btn>
                           Lock WELL
@@ -303,7 +313,7 @@
                     </div>
                   </div>
                   <p class="well-disclaimer" role="note">
-                    Demo only · not a real EHR · not HIPAA-certified · no PHI leaves the browser.
+                    Local demo — not production auth / not HIPAA. Not a real EHR · not a production clinical system · PHI must not leave the browser.
                   </p>
                 </header>
 
@@ -322,27 +332,33 @@
                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                       </svg>
                     </div>
-                    <p class="well-auth-eyebrow">Second authentication lock</p>
-                    <h4 id="well-auth-title" class="well-auth-title">WELL clinical sign-in</h4>
+                    <p class="well-auth-eyebrow">Demo step-up · not production auth</p>
+                    <h4 id="well-auth-title" class="well-auth-title">WELL demo chart</h4>
                     <p id="well-auth-desc" class="well-auth-desc">
-                      Chart and provider content stay locked until you complete username/password and a demo second factor (2FA). Separate from the WAYMAKERS site login.
+                      Separate from WAYMAKERS site sign-in. This lock is not clinical authentication.
                     </p>
 
-                    <div class="well-auth-steps" data-well-auth-steps aria-hidden="true">
-                      <span class="well-auth-step is-active" data-well-auth-step-indicator="1">1 · Credentials</span>
-                      <span class="well-auth-step" data-well-auth-step-indicator="2">2 · 2FA</span>
+                    <div class="well-auth-demo-chrome" data-well-demo-chrome role="note" hidden>
+                      <strong>Local demo — not production auth / not HIPAA.</strong>
+                      Demo EHR only. PHI must not leave this browser. The one-time code is created here after demo unlock. It is not shipped with the site.
+                    </div>
+
+                    <div class="well-auth-steps" data-well-auth-steps hidden>
+                      <span class="well-auth-step is-active" data-well-auth-step-indicator="1">1 · Name</span>
+                      <span class="well-auth-step" data-well-auth-step-indicator="2">2 · Code</span>
                     </div>
 
                     <form
                       class="well-auth-form"
-                      data-well-auth-form="credentials"
+                      data-well-auth-form="demo"
                       action="#"
                       method="post"
                       novalidate
                       autocomplete="off"
+                      hidden
                     >
                       <div class="form-group">
-                        <label for="well-auth-username">WELL username</label>
+                        <label for="well-auth-username">Display name for this local demo</label>
                         <input
                           type="text"
                           id="well-auth-username"
@@ -351,26 +367,15 @@
                           autocapitalize="none"
                           spellcheck="false"
                           required
-                          placeholder="well-alexa"
-                        >
-                      </div>
-                      <div class="form-group">
-                        <label for="well-auth-password">WELL password</label>
-                        <input
-                          type="password"
-                          id="well-auth-password"
-                          name="wellPassword"
-                          autocomplete="off"
-                          required
-                          placeholder="••••••••"
+                          placeholder="Your name"
                         >
                       </div>
                       <p class="well-auth-status" data-well-auth-status="credentials" hidden role="status" aria-live="polite"></p>
                       <div class="form-actions well-auth-actions">
-                        <button type="submit" class="btn btn-primary well-auth-submit">Continue to 2FA</button>
+                        <button type="submit" class="btn btn-primary well-auth-submit">Continue</button>
                       </div>
                       <p class="form-hint well-auth-hint">
-                        Demo WELL credentials: <code>well-alexa</code> or <code>alexa</code> · password <code>WellLock26</code>
+                        No password ships with this site. Continue to create a one-time code in this browser.
                       </p>
                     </form>
 
@@ -384,9 +389,9 @@
                       hidden
                     >
                       <div class="well-auth-demo-code" data-well-auth-demo-code role="note">
-                        <span class="well-auth-demo-label">Demo authenticator / second factor</span>
-                        <strong class="well-auth-demo-value">Demo authenticator code: <code data-well-auth-code-display>————</code></strong>
-                        <span class="well-auth-demo-note">Shown on-screen for this prototype — not sent by SMS.</span>
+                        <span class="well-auth-demo-label">Local demo code</span>
+                        <strong class="well-auth-demo-value">Created in this browser: <code data-well-auth-code-display>————</code></strong>
+                        <span class="well-auth-demo-note">Not sent by SMS. Not stored as a site password.</span>
                       </div>
                       <div class="form-group">
                         <label for="well-auth-otp">6-digit verification code</label>
@@ -399,19 +404,20 @@
                           maxlength="6"
                           autocomplete="one-time-code"
                           required
-                          placeholder="246801"
+                          placeholder="000000"
                           spellcheck="false"
                         >
                       </div>
                       <p class="well-auth-status" data-well-auth-status="otp" hidden role="status" aria-live="polite"></p>
                       <div class="form-actions well-auth-actions">
                         <button type="button" class="btn btn-secondary" data-well-auth-back>Back</button>
-                        <button type="submit" class="btn btn-primary well-auth-submit">Unlock WELL</button>
+                        <button type="submit" class="btn btn-primary well-auth-submit">Unlock demo chart</button>
                       </div>
-                      <p class="form-hint well-auth-hint">
-                        Enter the demo authenticator code shown above (prototype always uses a displayed code).
-                      </p>
                     </form>
+
+                    <p class="well-auth-offline" data-well-auth-offline role="status">
+                      WELL clinical sign-in is not live. Use Demo unlock or <code>?demo=1</code> for a local demo. No production identity provider is connected.
+                    </p>
                   </div>
                 </div>
 
@@ -475,7 +481,15 @@
             </div>
 
             <div role="tabpanel" id="panel-home" aria-labelledby="tab-home" hidden>
-              <!-- HOME placeholder — content TBD -->
+              <div class="home-shell" data-home-shell>
+                <header class="home-intro">
+                  <h3 class="home-title">HOME</h3>
+                  <p class="home-dek">Not live yet.</p>
+                </header>
+                <p class="home-empty" role="status">
+                  Hub coming soon. HOME has no live feed or services in this build — the post-sign-in hub is still a known gap.
+                </p>
+              </div>
             </div>
 
             <div role="tabpanel" id="panel-jobs" aria-labelledby="tab-jobs" hidden>
@@ -483,7 +497,10 @@
                 <header class="jobs-intro">
                   <h3 class="jobs-title">CAREER</h3>
                   <p class="jobs-dek">Applicant board · local company openings plus Indeed / LinkedIn by location</p>
-                  <p class="jobs-role-note">Companies manage care work in WELL; openings to apply for live here.</p>
+                  <p class="jobs-role-note">Companies manage care work in WELL; openings to apply for are listed here.</p>
+                  <p class="jobs-deferral" role="note">
+                    Local demo. Waymakers Apply does not submit applications. Indeed and LinkedIn cards are deeplink only — the jobs API is not a live listings feed.
+                  </p>
                 </header>
 
                 <div class="jobs-filter-row">
@@ -509,7 +526,7 @@
                   <p class="jobs-empty" data-jobs-empty hidden>No openings match.</p>
                 </div>
 
-                <p class="jobs-footer-note">Waymakers openings keyed by company id (WELL &amp; PAGES) · Indeed / LinkedIn are labeled external search links until Publisher / partner API keys are configured</p>
+                <p class="jobs-footer-note">Waymakers openings keyed by company id (WELL &amp; PAGES) · Indeed / LinkedIn: deeplink only, jobs API not live</p>
               </div>
             </div>
           </div>

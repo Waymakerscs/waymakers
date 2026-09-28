@@ -1,20 +1,21 @@
 /**
- * Cognation login gate — required username/password (client-side gate on Pages).
- * Not a substitute for server auth; fine for a private $0 preview.
+ * WAYMAKERS login gate — Supabase email/password, or an explicit local demo.
+ * Demo unlock is ?demo=1 or the "Demo unlock" control. It sets sessionStorage
+ * waymakers.demo.unlock.v1. No demo password ships in this file.
  *
  * After credentials succeed, if the account has 2 Tower profiles, show a
  * Choose profile step (Personal / Professional). Session records
  * activeProfileId + profileKind.
  *
  * Session: waymakers.session.v2
- * Demo storage disclaimer: in-browser registry only — not production identity.
+ * CognationAuth remains as an alias (naming debt — do not drop it here).
  */
 (function () {
   "use strict";
 
   var SESSION_KEY = "waymakers.session.v2";
+  var DEMO_UNLOCK_KEY = "waymakers.demo.unlock.v1";
   var EXPECTED_USER = "alexa";
-  var EXPECTED_PASS = "TowerCommune26";
 
   var API_BASE =
     (window.CognationConfig && window.CognationConfig.apiBaseUrl) || "/api";
@@ -35,6 +36,66 @@
   var pendingUsername = null;
   var pendingProfiles = null;
   var pendingAuth = null;
+
+  function readDemoUnlock() {
+    try {
+      var raw = sessionStorage.getItem(DEMO_UNLOCK_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || !data.ok) return null;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeDemoUnlock(source) {
+    var data = { ok: true, at: Date.now(), source: source || "button" };
+    try {
+      sessionStorage.setItem(DEMO_UNLOCK_KEY, JSON.stringify(data));
+    } catch (e) {}
+    return data;
+  }
+
+  function clearDemoUnlock() {
+    try {
+      sessionStorage.removeItem(DEMO_UNLOCK_KEY);
+    } catch (e) {}
+  }
+
+  function consumeDemoQuery() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get("demo") !== "1") return false;
+      writeDemoUnlock("query");
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function showDemoBanner(on) {
+    var el = document.querySelector("[data-demo-banner]");
+    if (el) el.hidden = !on;
+    document.body.classList.toggle("waymakers-demo-unlock", !!on);
+  }
+
+  function enterDemo(source) {
+    var existing = readDemoUnlock();
+    writeDemoUnlock((existing && existing.source) || source || "button");
+    var current = readLocalSession();
+    var keepSupabase = current && current.source === "supabase" && current.supabaseUserId;
+    if (!keepSupabase) {
+      writeLocalSession(buildSession("demo", null, { source: "demo-unlock" }));
+    }
+    showDemoBanner(true);
+    closeGate();
+    document.dispatchEvent(
+      new CustomEvent("waymakers:demo-unlock", {
+        detail: { source: (readDemoUnlock() && readDemoUnlock().source) || source || "button" },
+      })
+    );
+  }
 
   function setStatus(message, isError) {
     if (!statusEl) return;
@@ -270,6 +331,8 @@
         ? window.CognationSupabase.signOut().catch(function () {})
         : Promise.resolve();
     return remote.then(function () {
+      clearDemoUnlock();
+      showDemoBanner(false);
       writeLocalSession(null);
       openGate({
         message: opts.message || "Signed out. Sign in to continue.",
@@ -279,6 +342,7 @@
   }
 
   function isAuthenticated() {
+    if (readDemoUnlock()) return true;
     var current = readLocalSession();
     if (
       window.CognationSupabase &&
@@ -415,8 +479,25 @@
     apiBaseUrl: API_BASE,
   };
   window.WAYMAKERSAuth = window.CognationAuth;
+  window.WAYMAKERSDemo = {
+    KEY: DEMO_UNLOCK_KEY,
+    isUnlocked: function () {
+      return !!readDemoUnlock();
+    },
+    unlock: function (source) {
+      enterDemo(source || "button");
+      return readDemoUnlock();
+    },
+    clear: clearDemoUnlock,
+  };
 
   document.addEventListener("click", function (ev) {
+    var demoBtn = ev.target && ev.target.closest && ev.target.closest("[data-demo-unlock]");
+    if (demoBtn) {
+      ev.preventDefault();
+      enterDemo("button");
+      return;
+    }
     var btn = ev.target && ev.target.closest && ev.target.closest("[data-cognation-logout]");
     if (!btn) return;
     ev.preventDefault();
@@ -463,6 +544,13 @@
     try {
       localStorage.removeItem("cognation.session.demo.v1");
     } catch (e) {}
+    var fromQuery = consumeDemoQuery();
+    var demo = readDemoUnlock();
+    if (demo) {
+      enterDemo(fromQuery ? "query" : demo.source || "button");
+      return;
+    }
+    showDemoBanner(false);
     var session = readLocalSession();
     var remoteConfigured =
       window.CognationSupabase &&

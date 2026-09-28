@@ -51,9 +51,9 @@ function deeplinkPayload(source, location, q) {
     location,
     q,
     message:
-      source === "linkedin"
-        ? "LinkedIn Jobs API is partner-gated. Set LINKEDIN_* secrets after partnership approval, or use the deep-link card."
-        : "Indeed Publisher credentials not configured. Set INDEED_PUBLISHER_ID (and INDEED_API_KEY if required), or use the deep-link card.",
+      "Not live. This Function is deeplink-only and does not return job listings. Open the search URL on " +
+      (source === "linkedin" ? "LinkedIn" : "Indeed") +
+      ".",
     searchUrl: url,
     jobs: [],
   };

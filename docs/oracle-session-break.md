@@ -1,6 +1,8 @@
 # Oracle deploy notes — session / screen-break (Head Hancho)
 
-Short ops brief for putting the COGNATION **session + screen-break** API next to the static site on OCI without paid extras.
+**Not live for WAYMAKERS.** Pages sign-in is Supabase. This Express session service is a stub and is not the `waymakers.pages.dev` session. See [`SOURCE-OF-TRUTH.md`](../SOURCE-OF-TRUTH.md).
+
+Short ops brief for putting the COGNATION **session + screen-break** API next to a static site on OCI without paid extras.
 
 ## What it is
 
