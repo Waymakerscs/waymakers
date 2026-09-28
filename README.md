@@ -8,10 +8,11 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
 
 - Header masthead: **WAYMAKERS** wordmark (glowing black on silvery holo) + tagline “A wellness concierge”
 - Signup / sign-in (WAYMAKERS Supabase)
-- Tabs: **WELL · PAGES · JOBS** (roles stay distinct)
+- Tabs: **WELL · PAGES · HOME · CAREER** (roles stay distinct)
   - **WELL** — company/provider UI (EHR demo chart, roster, doctor→patient messages, audit-only doctor notes, Apple Health consent + export upload)
   - **PAGES** — local directory of what’s available (`pages.js`)
-  - **JOBS** — applicant board (`jobs.js` + `jobs-adapters.js`); openings keyed by `companyId`, plus Indeed / LinkedIn by location
+  - **HOME** — empty placeholder (content TBD)
+  - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); openings keyed by `companyId`, plus Indeed / LinkedIn by location
 - Tower, Commune, badges, and widgets are **not** included
 
 ## Company identity (Well ↔ Jobs ↔ Pages)
@@ -21,14 +22,14 @@ Shared registry: `js/companies.js` (`WaymakersCompanies`).
 | Surface | Role | Link field |
 | --- | --- | --- |
 | WELL | Company/provider workspace | `provider.companyId` (e.g. Hyde Park Family Medicine) |
-| JOBS | Where applicants apply | each post’s `companyId` |
-| PAGES | Public directory | listing `companyId` → **View jobs** opens JOBS filtered to that company |
+| CAREER (JOBS) | Where applicants apply | each post’s `companyId` |
+| PAGES | Public directory | listing `companyId` → **View jobs** opens CAREER (JOBS panel) filtered to that company |
 
 Deep link: `#jobs/<companyId>` (also `#jobs` for all). API: `WaymakersJobs.filterByCompany(id)`.
 
-## JOBS sources (v1)
+## CAREER / JOBS sources (v1)
 
-Filters on the JOBS tab:
+Filters on the CAREER tab (jobs panel):
 
 | Filter | Values |
 | --- | --- |

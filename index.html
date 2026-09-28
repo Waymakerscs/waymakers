@@ -248,7 +248,8 @@
             <div role="tablist" aria-label="WAYMAKERS topics" class="tablist">
               <button type="button" role="tab" id="tab-well" aria-controls="panel-well" aria-selected="true" tabindex="0">WELL</button>
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1">PAGES</button>
-              <button type="button" role="tab" id="tab-jobs" aria-controls="panel-jobs" aria-selected="false" tabindex="-1">JOBS</button>
+              <button type="button" role="tab" id="tab-home" aria-controls="panel-home" aria-selected="false" tabindex="-1">HOME</button>
+              <button type="button" role="tab" id="tab-jobs" aria-controls="panel-jobs" aria-selected="false" tabindex="-1">CAREER</button>
             </div>
             <div class="app-topbar-actions">
               <button type="button" class="app-logout-btn" data-cognation-logout>Log out</button>
@@ -473,10 +474,14 @@
               </div>
             </div>
 
+            <div role="tabpanel" id="panel-home" aria-labelledby="tab-home" hidden>
+              <!-- HOME placeholder — content TBD -->
+            </div>
+
             <div role="tabpanel" id="panel-jobs" aria-labelledby="tab-jobs" hidden>
               <div class="jobs-shell" data-jobs-shell>
                 <header class="jobs-intro">
-                  <h3 class="jobs-title">JOBS</h3>
+                  <h3 class="jobs-title">CAREER</h3>
                   <p class="jobs-dek">Applicant board · local company openings plus Indeed / LinkedIn by location</p>
                   <p class="jobs-role-note">Companies manage care work in WELL; openings to apply for live here.</p>
                 </header>
