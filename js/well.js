@@ -13,6 +13,11 @@
  *   consent + upload events are append-only in appleHealth.audit. Live HealthKit sync
  *   needs a native iOS app later — web UI stays honest about that.
  *
+ * Scheduling: month calendar on Patient and Provider. First-available slots come from
+ *   clinic hours + existing appointments + a demo Outlook busy feed when that side
+ *   is connected. CalendarAdapters.outlook.listBusy is the seam for a future
+ *   Microsoft Graph client — this build does not perform live OAuth or send PHI.
+ *
  * Demo only — not a real EHR. Do not claim HIPAA compliance.
  */
 (function () {
@@ -47,7 +52,7 @@
   var APPLE_HEALTH_MAX_BYTES = 25 * 1024 * 1024; /* 25 MB demo cap */
 
   var DEMO_SEED = {
-    version: 5,
+    version: 6,
     patient: {
       name: "Alexa J. Thomas",
       dob: "1990-04-12",
@@ -216,6 +221,20 @@
       calYear: 2026,
       calMonth: 8,
       selectedCalDate: "2026-09-18",
+      /* Weekday clinic template. Editable in portal prefs; slot picker reads it. */
+      clinicHours: {
+        slotMinutes: 30,
+        weekdays: [1, 2, 3, 4, 5],
+        blocks: [
+          { start: "09:00", end: "12:00" },
+          { start: "13:00", end: "16:30" },
+        ],
+      },
+      /* Per-side calendar connection. Keys stay on the portal record (not a new store). */
+      calendarConnections: {
+        patient: { providerId: "", connected: false, calendarName: "", account: "", lastSync: "" },
+        provider: { providerId: "", connected: false, calendarName: "", account: "", lastSync: "" },
+      },
     },
   };
 
@@ -298,14 +317,19 @@
       });
   }
 
-  function patientFacingAppointments(data) {
+  function isPatientAppointment(data, a) {
+    if (!a) return false;
     var pname = (data.patient && data.patient.name) || "";
+    if (a.patientId === "p1") return true;
+    if (a.patientName && pname && a.patientName === pname) return true;
+    /* Legacy seed rows without patient fields belong to the demo patient */
+    if (!a.patientId && !a.patientName) return true;
+    return false;
+  }
+
+  function patientFacingAppointments(data) {
     return (data.appointments || []).filter(function (a) {
-      if (a.patientId === "p1") return true;
-      if (a.patientName && pname && a.patientName === pname) return true;
-      /* Legacy seed rows without patient fields belong to the demo patient */
-      if (!a.patientId && !a.patientName) return true;
-      return false;
+      return isPatientAppointment(data, a);
     });
   }
 
@@ -327,16 +351,705 @@
     return "a" + Date.now().toString(36) + Math.floor(Math.random() * 1000).toString(36);
   }
 
-  function renderMonthCalendar(data) {
+  /* ===== Scheduling calendar + demo Outlook adapter =====
+   * CalendarAdapters.outlook.listBusy is the only seam a future Microsoft
+   * Graph client needs to replace. Google and Apple stay unavailable stubs.
+   * Nothing here performs OAuth or leaves the browser.
+   */
+
+  var VISIT_TYPES = [
+    { id: "annual", label: "Annual wellness" },
+    { id: "sick", label: "Sick visit" },
+    { id: "followup", label: "Follow-up" },
+    { id: "labs", label: "Labs" },
+  ];
+
+  var WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function visitTypeLabel(id) {
+    var hit = VISIT_TYPES.filter(function (v) {
+      return v.id === id;
+    })[0];
+    return hit ? hit.label : "";
+  }
+
+  function defaultClinicHours() {
+    return {
+      slotMinutes: 30,
+      weekdays: [1, 2, 3, 4, 5],
+      blocks: [
+        { start: "09:00", end: "12:00" },
+        { start: "13:00", end: "16:30" },
+      ],
+    };
+  }
+
+  function defaultCalendarConnection() {
+    return { providerId: "", connected: false, calendarName: "", account: "", lastSync: "" };
+  }
+
+  function timeToMinutes(hhmm) {
+    var p = String(hhmm || "").split(":");
+    if (p.length < 2) return NaN;
+    var h = parseInt(p[0], 10);
+    var m = parseInt(p[1], 10);
+    if (isNaN(h) || isNaN(m)) return NaN;
+    return h * 60 + m;
+  }
+
+  function minutesToTime(mins) {
+    var m = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+    return pad2(Math.floor(m / 60)) + ":" + pad2(m % 60);
+  }
+
+  function formatTime12(hhmm) {
+    var mins = timeToMinutes(hhmm);
+    if (isNaN(mins)) return String(hhmm || "");
+    var h = Math.floor(mins / 60);
+    var ap = h >= 12 ? "PM" : "AM";
+    var h12 = h % 12;
+    if (h12 === 0) h12 = 12;
+    return h12 + ":" + pad2(mins % 60) + " " + ap;
+  }
+
+  function startOfDay(d) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function addDays(d, n) {
+    var x = startOfDay(d);
+    x.setDate(x.getDate() + n);
+    return x;
+  }
+
+  function isSameDay(a, b) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  function dateToIso(d) {
+    return isoDate(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function formatSlotWhen(dateIso, time) {
+    var parts = String(dateIso || "").split("-");
+    if (parts.length !== 3) return String(dateIso || "") + " " + formatTime12(time);
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    if (isNaN(d.getTime())) return dateIso + " " + formatTime12(time);
+    return WEEKDAY_SHORT[d.getDay()] + ", " + MONTH_SHORT[d.getMonth()] + " " + d.getDate() + " · " + formatTime12(time);
+  }
+
+  function rangesOverlap(aStart, aEnd, bStart, bEnd) {
+    return aStart < bEnd && bStart < aEnd;
+  }
+
+  function normalizeClinicHours(hours) {
+    var base = defaultClinicHours();
+    if (!hours || typeof hours !== "object") return base;
+    var slot = Number(hours.slotMinutes);
+    if (!slot || slot < 5 || slot > 240) slot = base.slotMinutes;
+    var weekdays = Array.isArray(hours.weekdays) && hours.weekdays.length
+      ? hours.weekdays.map(function (n) { return Number(n); }).filter(function (n) { return n >= 0 && n <= 6; })
+      : base.weekdays.slice();
+    if (!weekdays.length) weekdays = base.weekdays.slice();
+    var blocks = [];
+    (Array.isArray(hours.blocks) ? hours.blocks : []).forEach(function (b) {
+      if (!b) return;
+      var start = timeToMinutes(b.start);
+      var end = timeToMinutes(b.end);
+      if (isNaN(start) || isNaN(end) || end <= start) return;
+      blocks.push({ start: minutesToTime(start), end: minutesToTime(end) });
+    });
+    if (!blocks.length) blocks = base.blocks.map(function (b) { return { start: b.start, end: b.end }; });
+    return { slotMinutes: slot, weekdays: weekdays, blocks: blocks };
+  }
+
+  function ensureCalendarPrefs(data) {
     ensureCalPrefs(data);
+    data.prefs.clinicHours = normalizeClinicHours(data.prefs.clinicHours);
+    if (!data.prefs.calendarConnections || typeof data.prefs.calendarConnections !== "object") {
+      data.prefs.calendarConnections = {};
+    }
+    ["patient", "provider"].forEach(function (side) {
+      var c = data.prefs.calendarConnections[side];
+      if (!c || typeof c !== "object") {
+        data.prefs.calendarConnections[side] = defaultCalendarConnection();
+        return;
+      }
+      c.providerId = c.providerId || "";
+      c.connected = !!c.connected;
+      c.calendarName = c.calendarName || "";
+      c.account = c.account || "";
+      c.lastSync = c.lastSync || "";
+    });
+    return data;
+  }
+
+  function clinicName(data) {
+    return (
+      (data.patient && data.patient.preferredClinic) ||
+      (data.provider && data.provider.clinic) ||
+      "Hyde Park Family Medicine"
+    );
+  }
+
+  function clinicianName(data) {
+    return (data.patient && data.patient.pcp) || (data.provider && data.provider.name) || "Your clinician";
+  }
+
+  function isClinicDow(date, hours) {
+    return hours.weekdays.indexOf(date.getDay()) !== -1;
+  }
+
+  function dayHasBookableSlot(day, now, hours) {
+    var nowMin = isSameDay(day, now) ? now.getHours() * 60 + now.getMinutes() : -1;
+    var slot = hours.slotMinutes;
+    var open = false;
+    hours.blocks.forEach(function (block) {
+      var start = timeToMinutes(block.start);
+      var end = timeToMinutes(block.end);
+      var t;
+      for (t = start; t + slot <= end; t += slot) {
+        if (t > nowMin) open = true;
+      }
+    });
+    return open;
+  }
+
+  function firstBookableDay(now, hours) {
+    var d = startOfDay(now);
+    var guard = 0;
+    while (guard < 28) {
+      if (isClinicDow(d, hours) && dayHasBookableSlot(d, now, hours)) return d;
+      d = addDays(d, 1);
+      guard++;
+    }
+    return d;
+  }
+
+  function clinicDayOffset(origin, hours, index) {
+    var d = startOfDay(origin);
+    var seen = 0;
+    var guard = 0;
+    while (guard < 48) {
+      if (isClinicDow(d, hours)) {
+        if (seen === index) return d;
+        seen++;
+      }
+      d = addDays(d, 1);
+      guard++;
+    }
+    return d;
+  }
+
+  /**
+   * In-repo mock Outlook feed. Events sit on upcoming clinic days so connecting
+   * always changes first-available, including evenings and Fridays.
+   * Replace CalendarAdapters.outlook.listBusy to source these from Graph later.
+   */
+  function demoOutlookEvents(side, now, hours) {
+    hours = normalizeClinicHours(hours);
+    now = now || new Date();
+    var origin = firstBookableDay(now, hours);
+    var d0 = dateToIso(clinicDayOffset(origin, hours, 0));
+    var d1 = dateToIso(clinicDayOffset(origin, hours, 1));
+    var d2 = dateToIso(clinicDayOffset(origin, hours, 2));
+    if (side === "provider") {
+      return [
+        { date: d0, start: "09:00", end: "10:00", title: "Hospital rounds", sourceLabel: "Clinic Outlook · demo", side: "provider" },
+        { date: d0, start: "14:00", end: "15:00", title: "Clinic admin block", sourceLabel: "Clinic Outlook · demo", side: "provider" },
+        { date: d1, start: "11:00", end: "12:00", title: "Peer review", sourceLabel: "Clinic Outlook · demo", side: "provider" },
+      ];
+    }
+    return [
+      { date: d0, start: "09:00", end: "10:30", title: "Work block", sourceLabel: "Your Outlook · demo", side: "patient" },
+      { date: d0, start: "13:00", end: "14:00", title: "Personal hold", sourceLabel: "Your Outlook · demo", side: "patient" },
+      { date: d1, start: "11:00", end: "12:00", title: "Dentist", sourceLabel: "Your Outlook · demo", side: "patient" },
+      { date: d2, start: "15:00", end: "16:30", title: "Volunteer shift", sourceLabel: "Your Outlook · demo", side: "patient" },
+    ];
+  }
+
+  var CalendarAdapters = {
+    outlook: {
+      id: "outlook",
+      label: "Outlook Calendar",
+      available: true,
+      demo: true,
+      profile: function (side) {
+        if (side === "provider") {
+          return {
+            calendarName: "Hyde Park Clinic · Dr. Chen",
+            account: "mchen@hydepark.demo",
+          };
+        }
+        return {
+          calendarName: "Alexa Thomas",
+          account: "alexa.demo@outlook.demo",
+        };
+      },
+      listBusy: function (ctx) {
+        ctx = ctx || {};
+        return demoOutlookEvents(ctx.side || "patient", ctx.now, ctx.hours);
+      },
+    },
+    google: {
+      id: "google",
+      label: "Google Calendar",
+      available: false,
+      demo: false,
+    },
+    apple: {
+      id: "apple",
+      label: "Apple Calendar",
+      available: false,
+      demo: false,
+    },
+  };
+
+  function outlookConnected(data, side) {
+    ensureCalendarPrefs(data);
+    var c = data.prefs.calendarConnections[side];
+    return !!(c && c.connected && c.providerId === "outlook");
+  }
+
+  function connectCalendar(data, side, providerId) {
+    ensureCalendarPrefs(data);
+    var adapter = CalendarAdapters[providerId];
+    if (!adapter || !adapter.available) return { ok: false, reason: "unavailable" };
+    var profile = adapter.profile(side === "provider" ? "provider" : "patient");
+    data.prefs.calendarConnections[side] = {
+      providerId: adapter.id,
+      connected: true,
+      calendarName: profile.calendarName,
+      account: profile.account,
+      lastSync: nowStamp(),
+    };
+    return { ok: true };
+  }
+
+  function disconnectCalendar(data, side) {
+    ensureCalendarPrefs(data);
+    data.prefs.calendarConnections[side] = defaultCalendarConnection();
+    return { ok: true };
+  }
+
+  function appointmentRangesOnDate(data, dateIso) {
+    var slot = (data.prefs.clinicHours && data.prefs.clinicHours.slotMinutes) || 30;
+    return appointmentsForDate(data, dateIso)
+      .map(function (a) {
+        var p = parseWhen(a.when);
+        var start = timeToMinutes(p.time || "");
+        if (isNaN(start)) return null;
+        var dur = Number(a.durationMin) || slot;
+        return { start: start, end: start + dur, kind: "appointment" };
+      })
+      .filter(Boolean);
+  }
+
+  function connectedOutlookEvents(data, now) {
+    ensureCalendarPrefs(data);
+    var events = [];
+    ["patient", "provider"].forEach(function (side) {
+      if (!outlookConnected(data, side)) return;
+      CalendarAdapters.outlook.listBusy({
+        side: side,
+        now: now,
+        hours: data.prefs.clinicHours,
+      }).forEach(function (ev) {
+        events.push(ev);
+      });
+    });
+    return events;
+  }
+
+  function busyRangesOnDate(data, dateIso, now) {
+    var ranges = appointmentRangesOnDate(data, dateIso);
+    connectedOutlookEvents(data, now).forEach(function (ev) {
+      if (ev.date !== dateIso) return;
+      var start = timeToMinutes(ev.start);
+      var end = timeToMinutes(ev.end);
+      if (isNaN(start) || isNaN(end) || end <= start) return;
+      ranges.push({ start: start, end: end, kind: "outlook", side: ev.side });
+    });
+    return ranges;
+  }
+
+  function slotIsBlocked(data, dateIso, time, now) {
+    var start = timeToMinutes(time);
+    if (isNaN(start)) return false;
+    var slot = data.prefs.clinicHours.slotMinutes || 30;
+    return busyRangesOnDate(data, dateIso, now || new Date()).some(function (r) {
+      return rangesOverlap(start, start + slot, r.start, r.end);
+    });
+  }
+
+  function firstAvailableSlots(data, opts) {
+    opts = opts || {};
+    ensureCalendarPrefs(data);
+    var now = opts.now || new Date();
+    var count = opts.count || 4;
+    if (count < 1) count = 1;
+    if (count > 8) count = 8;
+    var hours = data.prefs.clinicHours;
+    var slot = hours.slotMinutes;
+    var where = opts.where || clinicName(data);
+    var slots = [];
+    var day = startOfDay(now);
+    var guard = 0;
+    while (slots.length < count && guard < 56) {
+      if (isClinicDow(day, hours)) {
+        var nowMin = isSameDay(day, now) ? now.getHours() * 60 + now.getMinutes() : -1;
+        var dateIso = dateToIso(day);
+        var busy = busyRangesOnDate(data, dateIso, now);
+        hours.blocks.forEach(function (block) {
+          var start = timeToMinutes(block.start);
+          var end = timeToMinutes(block.end);
+          var t;
+          for (t = start; t + slot <= end && slots.length < count; t += slot) {
+            if (t <= nowMin) continue;
+            var clash = busy.some(function (r) {
+              return rangesOverlap(t, t + slot, r.start, r.end);
+            });
+            if (clash) continue;
+            slots.push({
+              date: dateIso,
+              time: minutesToTime(t),
+              end: minutesToTime(t + slot),
+              durationMin: slot,
+              where: where,
+              providerName: clinicianName(data),
+            });
+          }
+        });
+      }
+      day = addDays(day, 1);
+      guard++;
+    }
+    return slots;
+  }
+
+  function visibleOutlookBusy(data, dateIso, viewSide, now) {
+    var events = [];
+    function take(side) {
+      if (!outlookConnected(data, side)) return;
+      CalendarAdapters.outlook.listBusy({
+        side: side,
+        now: now || new Date(),
+        hours: data.prefs.clinicHours,
+      }).forEach(function (ev) {
+        if (ev.date === dateIso) events.push(ev);
+      });
+    }
+    if (viewSide === "provider") take("provider");
+    else {
+      take("patient");
+      take("provider");
+    }
+    events.sort(function (a, b) {
+      return String(a.start).localeCompare(String(b.start));
+    });
+    return events;
+  }
+
+  function busyDatesInMonth(data, year, month0, viewSide, now) {
+    ensureCalendarPrefs(data);
+    var set = {};
+    var prefix = year + "-" + pad2(month0 + 1);
+    function take(side) {
+      if (!outlookConnected(data, side)) return;
+      CalendarAdapters.outlook.listBusy({
+        side: side,
+        now: now || new Date(),
+        hours: data.prefs.clinicHours,
+      }).forEach(function (ev) {
+        if (String(ev.date || "").indexOf(prefix) === 0) set[ev.date] = true;
+      });
+    }
+    if (viewSide === "provider") take("provider");
+    else {
+      take("patient");
+      take("provider");
+    }
+    return set;
+  }
+
+  function appointmentDatesInMonth(data, year, month0, viewSide) {
+    var list = viewSide === "patient" ? patientFacingAppointments(data) : data.appointments || [];
+    var set = {};
+    list.forEach(function (a) {
+      var p = parseWhen(a.when);
+      if (!p.date) return;
+      var parts = p.date.split("-");
+      if (parts.length !== 3) return;
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      if (y === year && m === month0) set[p.date] = true;
+    });
+    return set;
+  }
+
+  function shiftCalendarMonth(data, delta) {
+    ensureCalendarPrefs(data);
+    data.prefs.calMonth += delta;
+    if (data.prefs.calMonth < 0) {
+      data.prefs.calMonth = 11;
+      data.prefs.calYear -= 1;
+    } else if (data.prefs.calMonth > 11) {
+      data.prefs.calMonth = 0;
+      data.prefs.calYear += 1;
+    }
+    return data;
+  }
+
+  function selectCalendarDay(data, day) {
+    ensureCalendarPrefs(data);
+    data.prefs.selectedCalDate = day;
+    var parts = String(day || "").split("-");
+    if (parts.length === 3) {
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      if (!isNaN(y) && !isNaN(m)) {
+        data.prefs.calYear = y;
+        data.prefs.calMonth = m;
+      }
+    }
+    return data;
+  }
+
+  function addPortalAppointment(data, fields) {
+    ensureCalendarPrefs(data);
+    data.appointments = data.appointments || [];
+    var appt = {
+      id: newAppointmentId(),
+      when: fields.date + " " + fields.time,
+      durationMin: fields.durationMin || data.prefs.clinicHours.slotMinutes || 30,
+      patientId: fields.patientId || "",
+      patientName: fields.patientName || "",
+      reason: fields.reason || "",
+      where: fields.where || clinicName(data),
+      source: fields.source || "manual",
+    };
+    data.appointments.push(appt);
+    selectCalendarDay(data, fields.date);
+    if (fields.patientId) data.prefs.selectedRosterId = fields.patientId;
+    return appt;
+  }
+
+  function clinicHoursBlurb(data) {
+    ensureCalendarPrefs(data);
+    var h = data.prefs.clinicHours;
+    var parts = h.blocks
+      .map(function (b) {
+        return formatTime12(b.start) + "–" + formatTime12(b.end);
+      })
+      .join(" and ");
+    return "Weekdays · " + parts + " · " + h.slotMinutes + "-minute slots";
+  }
+
+  function pushScheduleNotice(root, side, text, isError) {
+    if (!root) return;
+    root.__wellScheduleNotice = root.__wellScheduleNotice || {};
+    root.__wellScheduleNotice[side] = { text: text, error: !!isError };
+  }
+
+  function takeScheduleNotice(root, side) {
+    var bag = root && root.__wellScheduleNotice;
+    if (!bag || !bag[side]) return null;
+    var note = bag[side];
+    delete bag[side];
+    return note;
+  }
+
+  function renderScheduleNotice(note) {
+    if (!note || !note.text) return "";
+    return (
+      '<p class="well-book-status" role="status" aria-live="polite"' +
+      (note.error ? ' data-error="true"' : "") +
+      ">" +
+      escapeHtml(note.text) +
+      "</p>"
+    );
+  }
+
+  function renderVisitTypeField(id, dataAttr, required) {
+    var opts =
+      '<option value="">Choose visit type</option>' +
+      VISIT_TYPES.map(function (v) {
+        return '<option value="' + escapeHtml(v.id) + '">' + escapeHtml(v.label) + "</option>";
+      }).join("");
+    return (
+      '<div class="well-field">' +
+      '<label for="' +
+      id +
+      '">Visit type</label>' +
+      '<select id="' +
+      id +
+      '" ' +
+      dataAttr +
+      (required ? " required" : "") +
+      ">" +
+      opts +
+      "</select></div>"
+    );
+  }
+
+  function renderSlotChips(slots, mode) {
+    if (!slots.length) {
+      return '<p class="well-muted well-tiny">No open slots in the next 8 weeks.</p>';
+    }
+    var attr = mode === "book" ? "data-well-book-slot" : "data-well-slot-prefill";
+    var verb = mode === "book" ? "Book" : "Use";
+    return (
+      '<div class="well-slot-list" role="group" aria-label="First available appointment times">' +
+      slots
+        .map(function (s, i) {
+          var label = formatSlotWhen(s.date, s.time);
+          return (
+            '<button type="button" class="well-slot-chip" ' +
+            attr +
+            ' data-slot-date="' +
+            escapeHtml(s.date) +
+            '" data-slot-time="' +
+            escapeHtml(s.time) +
+            '" aria-label="' +
+            escapeHtml(verb + " " + label + " at " + (s.where || "the clinic")) +
+            '">' +
+            '<span class="well-slot-kicker">' +
+            verb +
+            " · option " +
+            (i + 1) +
+            "</span><strong>" +
+            escapeHtml(label) +
+            '</strong><span class="well-muted">' +
+            escapeHtml(s.where || "") +
+            " · " +
+            escapeHtml(s.providerName || "") +
+            "</span></button>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
+  function renderOutlookBusyHtml(events) {
+    if (!events || !events.length) return "";
+    return (
+      '<ul class="well-busy-list" aria-label="Outlook busy, unavailable">' +
+      events
+        .map(function (ev) {
+          return (
+            '<li class="well-busy-row">' +
+            '<span class="well-busy-time">' +
+            escapeHtml(formatTime12(ev.start)) +
+            "</span>" +
+            "<span><strong>" +
+            escapeHtml(ev.title || "Busy") +
+            '</strong><br><span class="well-muted">' +
+            escapeHtml(ev.sourceLabel || "Outlook · demo") +
+            " · " +
+            escapeHtml(formatTime12(ev.start) + "–" + formatTime12(ev.end)) +
+            " · unavailable</span></span></li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    );
+  }
+
+  function renderCalendarConnect(data, side) {
+    ensureCalendarPrefs(data);
+    var on = outlookConnected(data, side);
+    var conn = data.prefs.calendarConnections[side];
+    var status = on ? "Connected · demo Outlook" : "Not connected";
+    var detail = "";
+    if (on) {
+      detail =
+        '<p class="well-cal-conn-meta">' +
+        "<span>Calendar · " +
+        escapeHtml(conn.calendarName || "Outlook") +
+        "</span>" +
+        (conn.account ? "<span>Account · " + escapeHtml(conn.account) + "</span>" : "") +
+        (conn.lastSync ? "<span>Last sync · " + escapeHtml(conn.lastSync) + "</span>" : "") +
+        "</p>";
+    }
+    function row(id) {
+      var adapter = CalendarAdapters[id];
+      var action;
+      if (!adapter.available) {
+        action =
+          '<button type="button" class="btn btn-secondary well-mini-btn" disabled aria-disabled="true">Coming soon</button>';
+      } else if (on) {
+        action =
+          '<button type="button" class="btn btn-secondary well-mini-btn" data-well-cal-disconnect="outlook" data-well-cal-side="' +
+          side +
+          '">Disconnect</button>';
+      } else {
+        action =
+          '<button type="button" class="btn btn-primary well-mini-btn" data-well-cal-connect="outlook" data-well-cal-side="' +
+          side +
+          '">Connect</button>';
+      }
+      var badge = !adapter.available
+        ? '<span class="well-badge">Coming soon</span>'
+        : on
+          ? '<span class="well-badge">Demo</span>'
+          : "";
+      return (
+        '<li class="well-cal-provider-row"><span class="well-cal-provider-name">' +
+        escapeHtml(adapter.label) +
+        badge +
+        "</span>" +
+        action +
+        "</li>"
+      );
+    }
+    return (
+      '<div class="well-cal-connect" data-well-cal-connect-panel="' +
+      side +
+      '">' +
+      '<div class="well-cal-connect-head">' +
+      '<h5 class="well-cal-day-heading">Calendars</h5>' +
+      '<p class="well-cal-conn-status" data-state="' +
+      (on ? "connected" : "off") +
+      '"><span class="well-cal-conn-dot" aria-hidden="true"></span><span>' +
+      status +
+      "</span></p></div>" +
+      detail +
+      '<ul class="well-cal-provider-list">' +
+      row("outlook") +
+      row("google") +
+      row("apple") +
+      "</ul>" +
+      '<p class="well-muted well-tiny">Demo adapter only. Connect does not open Microsoft, Google, or Apple, and nothing leaves this browser.</p>' +
+      "</div>"
+    );
+  }
+
+  function renderCalendarLegend() {
+    return (
+      '<p class="well-cal-legend">' +
+      '<span class="well-cal-legend-item"><span class="well-cal-dot" aria-hidden="true"></span> Visit</span>' +
+      '<span class="well-cal-legend-item"><span class="well-cal-hatch" aria-hidden="true"></span> Outlook busy when connected</span>' +
+      "</p>"
+    );
+  }
+
+  function renderMonthCalendar(data, opts) {
+    opts = opts || {};
+    ensureCalendarPrefs(data);
     var year = data.prefs.calYear;
     var month0 = data.prefs.calMonth;
     var selected = data.prefs.selectedCalDate;
-    var marked = datesWithAppointments(data, year, month0);
+    var viewSide = opts.side || "";
+    var marked = viewSide
+      ? appointmentDatesInMonth(data, year, month0, viewSide)
+      : datesWithAppointments(data, year, month0);
+    var busy = viewSide ? busyDatesInMonth(data, year, month0, viewSide, opts.now) : {};
     var first = new Date(year, month0, 1);
     var startDow = first.getDay(); /* 0=Sun */
     var daysInMonth = new Date(year, month0 + 1, 0).getDate();
-    var today = new Date();
+    var today = opts.now || new Date();
     var todayIso = isoDate(today.getFullYear(), today.getMonth(), today.getDate());
 
     var cells = [];
@@ -350,21 +1063,25 @@
       if (iso === selected) cls += " is-selected";
       if (iso === todayIso) cls += " is-today";
       if (marked[iso]) cls += " has-appts";
+      if (busy[iso]) cls += " has-busy";
+      var ariaBits = [iso];
+      if (marked[iso]) ariaBits.push("has appointments");
+      if (busy[iso]) ariaBits.push("Outlook busy");
+      if (iso === selected) ariaBits.push("selected");
       cells.push(
         '<button type="button" class="' +
           cls +
           '" data-well-cal-day="' +
           escapeHtml(iso) +
           '" aria-label="' +
-          escapeHtml(iso) +
-          (marked[iso] ? ", has appointments" : "") +
-          (iso === selected ? ", selected" : "") +
+          escapeHtml(ariaBits.join(", ")) +
           '" aria-pressed="' +
           (iso === selected ? "true" : "false") +
           '"><span class="well-cal-daynum">' +
           i +
           "</span>" +
           (marked[iso] ? '<span class="well-cal-dot" aria-hidden="true"></span>' : "") +
+          (busy[iso] ? '<span class="well-cal-busy-mark" aria-hidden="true"></span>' : "") +
           "</button>"
       );
     }
@@ -389,7 +1106,9 @@
       "</div>" +
       '<div class="well-cal-grid" role="grid" aria-label="Schedule calendar">' +
       cells.join("") +
-      "</div></div>"
+      "</div>" +
+      renderCalendarLegend() +
+      "</div>"
     );
   }
 
@@ -415,14 +1134,14 @@
                 '" aria-pressed="' +
                 (on ? "true" : "false") +
                 '"><span class="well-roster-time">' +
-                escapeHtml(p.time || "—") +
+                escapeHtml(formatTime12(p.time) || "—") +
                 '</span><span class="well-roster-name">' +
                 escapeHtml(a.patientName || "Patient") +
                 '</span><span class="well-muted">' +
                 escapeHtml(a.reason || "") +
                 "</span></button>"
               : '<div class="well-roster-btn" tabindex="-1"><span class="well-roster-time">' +
-                escapeHtml(p.time || "—") +
+                escapeHtml(formatTime12(p.time) || "—") +
                 '</span><span class="well-roster-name">' +
                 escapeHtml(a.patientName || "Patient") +
                 '</span><span class="well-muted">' +
@@ -432,7 +1151,7 @@
             escapeHtml(a.id || "") +
             '" aria-label="Cancel appointment for ' +
             escapeHtml(a.patientName || "patient") +
-            ' at ' +
+            " at " +
             escapeHtml(p.time || "") +
             '">×</button>' +
             "</div></li>"
@@ -443,7 +1162,35 @@
     );
   }
 
+  function renderPatientDayVisits(data, dateIso) {
+    var list = appointmentsForDate(data, dateIso).filter(function (a) {
+      return isPatientAppointment(data, a);
+    });
+    if (!list.length) {
+      return '<p class="well-muted well-tiny">No visits on this day.</p>';
+    }
+    return (
+      '<ul class="well-list">' +
+      list
+        .map(function (a) {
+          var p = parseWhen(a.when);
+          return (
+            "<li><strong>" +
+            escapeHtml(formatTime12(p.time) || a.when) +
+            "</strong> · " +
+            escapeHtml(a.reason || "Visit") +
+            '<br><span class="well-muted">' +
+            escapeHtml(a.where || "") +
+            "</span></li>"
+          );
+        })
+        .join("") +
+      "</ul>"
+    );
+  }
+
   function renderScheduleForm(data, dateIso) {
+    ensureCalendarPrefs(data);
     var rosterOpts = (data.roster || [])
       .map(function (r) {
         return (
@@ -456,8 +1203,15 @@
       })
       .join("");
     var clinic = (data.provider && data.provider.clinic) || "Hyde Park Family Medicine";
+    var slots = firstAvailableSlots(data, { count: 4, where: clinic });
     return (
       '<form class="well-schedule-form" data-well-schedule-form>' +
+      renderVisitTypeField("well-sched-visit", 'data-well-sched="visitType"', false) +
+      '<div class="well-suggest-row">' +
+      '<button type="button" class="btn btn-secondary well-mini-btn" data-well-suggest-first>Suggest first available</button>' +
+      "</div>" +
+      '<p class="well-muted well-tiny" id="well-sched-hint" data-well-sched-hint>Next open times skip clinic bookings and connected Outlook busy blocks. You can still type a time.</p>' +
+      renderSlotChips(slots, "prefill") +
       '<div class="well-field">' +
       '<label for="well-sched-date">Date</label>' +
       '<input type="date" id="well-sched-date" name="date" data-well-sched="date" value="' +
@@ -494,6 +1248,182 @@
     );
   }
 
+  function draftPortal(root) {
+    var host = root.querySelector("[data-well-patient-root]");
+    if (!host) return ensureCalendarPrefs(PortalStore.get());
+    var activeDoc = host.querySelector("[data-well-doc]");
+    if (!activeDoc) return ensureCalendarPrefs(PortalStore.get());
+    try {
+      return ensureCalendarPrefs(collectFormFields(host, activeDoc.getAttribute("data-well-doc")));
+    } catch (e) {
+      return ensureCalendarPrefs(PortalStore.get());
+    }
+  }
+
+  function applySlotToScheduleForm(form, slot) {
+    if (!form || !slot) return;
+    var dateEl = form.querySelector('[data-well-sched="date"]');
+    var timeEl = form.querySelector('[data-well-sched="time"]');
+    var visit = form.querySelector('[data-well-sched="visitType"]');
+    var reason = form.querySelector('[data-well-sched="reason"]');
+    if (dateEl) dateEl.value = slot.date;
+    if (timeEl) timeEl.value = slot.time;
+    if (visit && reason && !String(reason.value || "").trim()) {
+      var label = visitTypeLabel(visit.value);
+      if (label) reason.value = label;
+    }
+    if (reason) reason.focus();
+  }
+
+  function bindCalendarChrome(root, host, side) {
+    function rerender(cur) {
+      if (side === "patient") renderPatient(root, cur);
+      else renderProvider(root, cur);
+    }
+    function load() {
+      return side === "patient" ? draftPortal(root) : ensureCalendarPrefs(PortalStore.get());
+    }
+    var prevBtn = host.querySelector("[data-well-cal-prev]");
+    var nextBtn = host.querySelector("[data-well-cal-next]");
+    if (prevBtn) {
+      prevBtn.addEventListener("click", function () {
+        var cur = shiftCalendarMonth(load(), -1);
+        PortalStore.save(cur);
+        rerender(cur);
+      });
+    }
+    if (nextBtn) {
+      nextBtn.addEventListener("click", function () {
+        var cur = shiftCalendarMonth(load(), 1);
+        PortalStore.save(cur);
+        rerender(cur);
+      });
+    }
+    host.querySelectorAll("[data-well-cal-day]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var cur = selectCalendarDay(load(), btn.getAttribute("data-well-cal-day"));
+        PortalStore.save(cur);
+        rerender(cur);
+      });
+    });
+    host.querySelectorAll("[data-well-cal-connect]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var which = btn.getAttribute("data-well-cal-connect");
+        var cur = load();
+        var result = connectCalendar(cur, side, which);
+        if (!result.ok) {
+          pushScheduleNotice(root, side, "That calendar is not available in this demo.", true);
+          rerender(cur);
+          return;
+        }
+        pushScheduleNotice(
+          root,
+          side,
+          "Connected · demo Outlook (" +
+            (cur.prefs.calendarConnections[side].calendarName || "Outlook") +
+            "). Busy times now block open slots. Nothing left this browser."
+        );
+        PortalStore.save(cur);
+        rerender(cur);
+      });
+    });
+    host.querySelectorAll("[data-well-cal-disconnect]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var cur = load();
+        disconnectCalendar(cur, side);
+        pushScheduleNotice(root, side, "Outlook disconnected. Open slots ignore that demo calendar.");
+        PortalStore.save(cur);
+        rerender(cur);
+      });
+    });
+  }
+
+  function isUpcomingWhen(when, now) {
+    var p = parseWhen(when);
+    if (!p.date) return false;
+    var today = dateToIso(now);
+    if (p.date > today) return true;
+    if (p.date < today) return false;
+    if (!p.time) return true;
+    return timeToMinutes(p.time) > now.getHours() * 60 + now.getMinutes();
+  }
+
+  function renderUpcomingAppointments(data, now) {
+    now = now || new Date();
+    var mine = patientFacingAppointments(data).slice().sort(function (a, b) {
+      return String(a.when || "").localeCompare(String(b.when || ""));
+    });
+    var upcoming = [];
+    var earlier = [];
+    mine.forEach(function (a) {
+      if (isUpcomingWhen(a.when, now)) upcoming.push(a);
+      else earlier.push(a);
+    });
+    function items(list) {
+      return list
+        .map(function (a) {
+          var p = parseWhen(a.when);
+          return (
+            "<li><strong>" +
+            escapeHtml(formatSlotWhen(p.date, p.time)) +
+            "</strong><br>" +
+            escapeHtml(a.reason || "") +
+            '<br><span class="well-muted">' +
+            escapeHtml(a.where || "") +
+            "</span></li>"
+          );
+        })
+        .join("");
+    }
+    var html =
+      "<ul class=\"well-list\">" +
+      (upcoming.length ? items(upcoming) : '<li class="well-muted">No upcoming appointments.</li>') +
+      "</ul>";
+    if (earlier.length) {
+      html +=
+        '<details class="well-earlier"><summary>Earlier visits (' +
+        earlier.length +
+        ")</summary><ul class=\"well-list\">" +
+        items(earlier.slice().reverse()) +
+        "</ul></details>";
+    }
+    return html;
+  }
+
+  function renderPatientScheduleCard(data, notice) {
+    ensureCalendarPrefs(data);
+    var selectedDate = data.prefs.selectedCalDate;
+    var slots = firstAvailableSlots(data, { count: 4 });
+    var busy = visibleOutlookBusy(data, selectedDate, "patient", new Date());
+    return (
+      '<section class="well-rail-card well-rail-card--calendar" aria-labelledby="well-pt-schedule-heading">' +
+      '<h4 id="well-pt-schedule-heading">Schedule</h4>' +
+      '<p class="well-muted well-tiny">Book with ' +
+      escapeHtml(clinicianName(data)) +
+      " · " +
+      escapeHtml(clinicName(data)) +
+      ". Saved in this browser only.</p>" +
+      renderScheduleNotice(notice) +
+      renderCalendarConnect(data, "patient") +
+      renderMonthCalendar(data, { side: "patient" }) +
+      '<p class="well-hours-note well-muted well-tiny">' +
+      escapeHtml(clinicHoursBlurb(data)) +
+      ". Open slots skip existing visits and any connected Outlook busy times.</p>" +
+      '<div class="well-cal-daypanel">' +
+      '<h5 class="well-cal-day-heading">Your day · ' +
+      escapeHtml(selectedDate) +
+      "</h5>" +
+      renderPatientDayVisits(data, selectedDate) +
+      renderOutlookBusyHtml(busy) +
+      "</div>" +
+      '<div class="well-cal-add">' +
+      "<h5 class=\"well-cal-day-heading\">First available</h5>" +
+      renderVisitTypeField("well-pt-visit", "data-well-pt-visit", true) +
+      '<p class="well-muted well-tiny" id="well-pt-slot-hint">Choose a visit type, then book one of the next open times.</p>' +
+      renderSlotChips(slots, "book") +
+      "</div></section>"
+    );
+  }
 
   function mergeSeed(raw) {
     var base = deepClone(DEMO_SEED);
@@ -599,8 +1529,8 @@
       }
     }
     base.appleHealth = mergeAppleHealthAppendOnly(base.appleHealth, raw.appleHealth);
-    base.version = Math.max(5, Number(raw.version) || 0, Number(base.version) || 0);
-    return ensureCalPrefs(ensureAppleHealth(base));
+    base.version = Math.max(6, Number(raw.version) || 0, Number(base.version) || 0);
+    return ensureCalendarPrefs(ensureAppleHealth(base));
   }
 
   var PortalStore = {
@@ -708,7 +1638,7 @@
         /* Apple Health: consent may change; uploads + audit are append-only */
         data.appleHealth = mergeAppleHealthAppendOnly(prev.appleHealth, data.appleHealth);
         ensureAppleHealth(data);
-        data.version = Math.max(5, Number(data.version) || 0);
+        data.version = Math.max(6, Number(data.version) || 0);
         localStorage.setItem(PORTAL_KEY, JSON.stringify(data));
         return true;
       } catch (e) {
@@ -2124,35 +3054,87 @@
     );
   }
 
+  function bindPatientBooking(root, host) {
+    bindCalendarChrome(root, host, "patient");
+    var visit = host.querySelector("[data-well-pt-visit]");
+    function syncSlots() {
+      var ready = !!(visit && visit.value);
+      host.querySelectorAll("[data-well-book-slot]").forEach(function (btn) {
+        btn.disabled = !ready;
+        btn.setAttribute("aria-disabled", ready ? "false" : "true");
+      });
+    }
+    if (visit) {
+      visit.addEventListener("change", function () {
+        syncSlots();
+        var hint = host.querySelector("#well-pt-slot-hint");
+        if (hint && visit.value) {
+          hint.textContent = "Next open times for " + visitTypeLabel(visit.value) + ". Pick one to book.";
+        }
+      });
+      syncSlots();
+    }
+    host.querySelectorAll("[data-well-book-slot]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var typeId = visit && visit.value;
+        var label = visitTypeLabel(typeId);
+        if (!label) {
+          pushScheduleNotice(root, "patient", "Choose a visit type, then pick a time.", true);
+          renderPatient(root, draftPortal(root));
+          return;
+        }
+        var date = btn.getAttribute("data-slot-date");
+        var time = btn.getAttribute("data-slot-time");
+        var cur = draftPortal(root);
+        var still = firstAvailableSlots(cur, { count: 8 }).some(function (s) {
+          return s.date === date && s.time === time;
+        });
+        if (!still) {
+          pushScheduleNotice(root, "patient", "That time just closed. Here are the next open visits.", true);
+          PortalStore.save(cur);
+          renderPatient(root, cur);
+          return;
+        }
+        addPortalAppointment(cur, {
+          date: date,
+          time: time,
+          patientId: "p1",
+          patientName: (cur.patient && cur.patient.name) || "Alexa J. Thomas",
+          reason: label,
+          where: clinicName(cur),
+          source: "first-available",
+        });
+        pushScheduleNotice(
+          root,
+          "patient",
+          "Booked " +
+            label +
+            " · " +
+            formatSlotWhen(date, time) +
+            ". It is on your calendar and in Upcoming. Saved in this browser only."
+        );
+        PortalStore.save(cur);
+        renderPatient(root, cur);
+      });
+    });
+  }
+
   function renderPatient(root, data, forceSection) {
     var host = root.querySelector("[data-well-patient-root]");
     if (!host) return;
-    data = data || PortalStore.get();
+    data = ensureCalendarPrefs(data || PortalStore.get());
+    var scheduleNote = takeScheduleNotice(root, "patient");
     var sectionId = forceSection || data.prefs.lastSection || "intake";
     if (!CHART_SECTIONS.some(function (s) { return s.id === sectionId; })) sectionId = "intake";
 
     /* Patient rail: own appointments + messages only — never a providers directory/list */
-    var myAppts = patientFacingAppointments(data);
     var apptHtml =
       '<aside class="well-side-rail" aria-label="Appointments and messages">' +
+      renderPatientScheduleCard(data, scheduleNote) +
       '<section class="well-rail-card">' +
-      "<h4>Upcoming appointments</h4><ul class=\"well-list\">" +
-      (myAppts.length
-        ? myAppts
-            .map(function (a) {
-              return (
-                "<li><strong>" +
-                escapeHtml(a.when) +
-                "</strong><br>" +
-                escapeHtml(a.reason) +
-                "<br><span class=\"well-muted\">" +
-                escapeHtml(a.where) +
-                "</span></li>"
-              );
-            })
-            .join("")
-        : '<li class="well-muted">No upcoming appointments.</li>') +
-      "</ul></section>" +
+      "<h4>Upcoming appointments</h4>" +
+      renderUpcomingAppointments(data) +
+      "</section>" +
       '<section class="well-rail-card">' +
       "<h4>Messages with your doctor</h4>" +
       '<div class="well-thread" role="log" aria-label="Doctor to patient messages">' +
@@ -2176,7 +3158,7 @@
     host.innerHTML =
       '<div class="well-chart well-chart--editable">' +
       chartBannerHtml(data.patient, "Fill chart / documentation") +
-      '<p class="well-role-hint">Patient side · fill and save chart documentation to this browser only.</p>' +
+      '<p class="well-role-hint">Patient side · fill and save chart documentation in this browser. Book a visit from Schedule.</p>' +
       sectionTabsHtml(sectionId, "well-pt") +
       '<div class="well-chart-paper" data-well-chart-paper role="tabpanel" aria-labelledby="well-pt-tab-' +
       escapeHtml(sectionId) +
@@ -2214,6 +3196,7 @@
     if (sectionId === "applehealth") {
       bindAppleHealthEditors(root, host);
     }
+    bindPatientBooking(root, host);
 
     var resetAll = host.querySelector("[data-well-reset-all]");
     if (resetAll) {
@@ -2221,6 +3204,12 @@
         var prev = PortalStore.get();
         var fresh = deepClone(DEMO_SEED);
         fresh.prefs.lastSection = sectionId;
+        if (prev.prefs && prev.prefs.calendarConnections) {
+          fresh.prefs.calendarConnections = deepClone(prev.prefs.calendarConnections);
+        }
+        if (prev.prefs && prev.prefs.clinicHours) {
+          fresh.prefs.clinicHours = deepClone(prev.prefs.clinicHours);
+        }
         /* Doctor notes + Apple Health are append-only — never wiped by chart reset */
         fresh.doctorNotes = deepClone(prev.doctorNotes || DEMO_SEED.doctorNotes);
         fresh.doctorNotesAudit = deepClone(
@@ -2270,7 +3259,8 @@
   function renderProvider(root, data) {
     var host = root.querySelector("[data-well-provider-root]");
     if (!host) return;
-    data = ensureCalPrefs(data || PortalStore.get());
+    data = ensureCalendarPrefs(data || PortalStore.get());
+    var scheduleNote = takeScheduleNotice(root, "provider");
     var sectionId = data.prefs.lastSection || "intake";
     if (!CHART_SECTIONS.some(function (s) { return s.id === sectionId; })) sectionId = "intake";
     var selectedId = data.prefs.selectedRosterId || "p1";
@@ -2294,6 +3284,7 @@
 
     var selectedDate = data.prefs.selectedCalDate;
     var dayListHtml = renderDayAppointmentsList(data, selectedDate);
+    var outlookBusy = renderOutlookBusyHtml(visibleOutlookBusy(data, selectedDate, "provider", new Date()));
 
     var rosterHtml =
       '<aside class="well-side-rail" aria-label="Schedule and inbox">' +
@@ -2319,15 +3310,21 @@
         : "") +
       "</p></section>" +
       WellCall.renderPanelHtml("provider", data) +
-      '<section class="well-rail-card well-rail-card--calendar">' +
-      "<h4>Schedule calendar</h4>" +
-      renderMonthCalendar(data) +
+      '<section class="well-rail-card well-rail-card--calendar" aria-labelledby="well-pv-schedule-heading">' +
+      '<h4 id="well-pv-schedule-heading">Schedule calendar</h4>' +
+      renderScheduleNotice(scheduleNote) +
+      renderCalendarConnect(data, "provider") +
+      renderMonthCalendar(data, { side: "provider" }) +
+      '<p class="well-hours-note well-muted well-tiny">' +
+      escapeHtml(clinicHoursBlurb(data)) +
+      ". Suggest first available skips bookings and connected Outlook busy times. Manual add still works.</p>" +
       '<div class="well-cal-daypanel">' +
       '<h5 class="well-cal-day-heading">Appointments · ' +
       escapeHtml(selectedDate) +
       "</h5>" +
       '<div data-well-day-appts>' +
       dayListHtml +
+      outlookBusy +
       "</div></div>" +
       '<div class="well-cal-add">' +
       "<h5 class=\"well-cal-day-heading\">Add appointment</h5>" +
@@ -2388,7 +3385,7 @@
     host.innerHTML =
       '<div class="well-chart well-chart--readonly">' +
       chartBannerHtml(viewPatient, "Chart view only") +
-      '<p class="well-role-hint">Provider side · documentation is locked. Browse chart sections; editing happens on Patient. Use the calendar to schedule.</p>' +
+      '<p class="well-role-hint">Provider side · documentation is locked. Browse chart sections; editing happens on Patient. Connect Outlook (demo) or suggest the next open slot, then add the visit.</p>' +
       (isPrimary ? sectionTabsHtml(sectionId, "well-pv") : "") +
       '<div class="well-chart-paper well-chart-paper--locked" data-well-chart-paper role="tabpanel"' +
       (isPrimary ? ' aria-labelledby="well-pv-tab-' + escapeHtml(sectionId) + '"' : "") +
@@ -2421,47 +3418,7 @@
       });
     });
 
-    var prevBtn = host.querySelector("[data-well-cal-prev]");
-    var nextBtn = host.querySelector("[data-well-cal-next]");
-    if (prevBtn) {
-      prevBtn.addEventListener("click", function () {
-        var cur = ensureCalPrefs(PortalStore.get());
-        cur.prefs.calMonth -= 1;
-        if (cur.prefs.calMonth < 0) {
-          cur.prefs.calMonth = 11;
-          cur.prefs.calYear -= 1;
-        }
-        PortalStore.save(cur);
-        renderProvider(root, cur);
-      });
-    }
-    if (nextBtn) {
-      nextBtn.addEventListener("click", function () {
-        var cur = ensureCalPrefs(PortalStore.get());
-        cur.prefs.calMonth += 1;
-        if (cur.prefs.calMonth > 11) {
-          cur.prefs.calMonth = 0;
-          cur.prefs.calYear += 1;
-        }
-        PortalStore.save(cur);
-        renderProvider(root, cur);
-      });
-    }
-
-    host.querySelectorAll("[data-well-cal-day]").forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        var cur = ensureCalPrefs(PortalStore.get());
-        var day = btn.getAttribute("data-well-cal-day");
-        cur.prefs.selectedCalDate = day;
-        var parts = day.split("-");
-        if (parts.length === 3) {
-          cur.prefs.calYear = parseInt(parts[0], 10);
-          cur.prefs.calMonth = parseInt(parts[1], 10) - 1;
-        }
-        PortalStore.save(cur);
-        renderProvider(root, cur);
-      });
-    });
+    bindCalendarChrome(root, host, "provider");
 
     host.querySelectorAll("[data-well-appt-cancel]").forEach(function (btn) {
       btn.addEventListener("click", function () {
@@ -2507,28 +3464,74 @@
           return;
         }
         var reason = (reasonEl && reasonEl.value.trim()) || "";
+        if (!reason) {
+          var visitEl = form.querySelector('[data-well-sched="visitType"]');
+          reason = visitTypeLabel(visitEl && visitEl.value);
+        }
         var where = (whereEl && whereEl.value.trim()) || "";
+        if (time.length > 5) time = time.slice(0, 5);
         if (!date || !time || !reason || !where) return;
 
-        cur.appointments = cur.appointments || [];
-        cur.appointments.push({
-          id: newAppointmentId(),
-          when: date + " " + time,
+        var blocked = slotIsBlocked(cur, date, time, new Date());
+        addPortalAppointment(cur, {
+          date: date,
+          time: time,
           patientId: patientId || "",
           patientName: patientName,
           reason: reason,
           where: where,
+          source: "provider-manual",
         });
-        cur.prefs.selectedCalDate = date;
-        var dp = date.split("-");
-        if (dp.length === 3) {
-          cur.prefs.calYear = parseInt(dp[0], 10);
-          cur.prefs.calMonth = parseInt(dp[1], 10) - 1;
-        }
-        if (patientId) cur.prefs.selectedRosterId = patientId;
+        pushScheduleNotice(
+          root,
+          "provider",
+          blocked
+            ? "Appointment added · " +
+                formatSlotWhen(date, time) +
+                ". That time overlaps a connected Outlook busy block — still saved."
+            : "Appointment added · " + formatSlotWhen(date, time) + "."
+        );
         PortalStore.save(cur);
         renderProvider(root, cur);
       });
+
+      var suggestBtn = form.querySelector("[data-well-suggest-first]");
+      if (suggestBtn) {
+        suggestBtn.addEventListener("click", function () {
+          var cur = ensureCalendarPrefs(PortalStore.get());
+          var whereInput = form.querySelector('[data-well-sched="where"]');
+          var slots = firstAvailableSlots(cur, {
+            count: 1,
+            where: (whereInput && whereInput.value) || clinicName(cur),
+          });
+          var hint = form.querySelector("[data-well-sched-hint]");
+          if (!slots.length) {
+            if (hint) hint.textContent = "No open slot in the next 8 weeks.";
+            return;
+          }
+          applySlotToScheduleForm(form, slots[0]);
+          if (hint) {
+            hint.textContent =
+              "Filled " + formatSlotWhen(slots[0].date, slots[0].time) + ". Add appointment to save it.";
+          }
+        });
+      }
+      form.querySelectorAll("[data-well-slot-prefill]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var date = btn.getAttribute("data-slot-date");
+          var time = btn.getAttribute("data-slot-time");
+          applySlotToScheduleForm(form, { date: date, time: time });
+          var hint = form.querySelector("[data-well-sched-hint]");
+          if (hint) hint.textContent = "Using " + formatSlotWhen(date, time) + ". Add appointment to save it.";
+        });
+      });
+      var visitSel = form.querySelector('[data-well-sched="visitType"]');
+      var reasonInput = form.querySelector('[data-well-sched="reason"]');
+      if (visitSel && reasonInput) {
+        visitSel.addEventListener("change", function () {
+          if (!reasonInput.value.trim()) reasonInput.value = visitTypeLabel(visitSel.value);
+        });
+      }
 
       var pidSelect = form.querySelector('[data-well-sched="patientId"]');
       var pnameInput = form.querySelector('[data-well-sched="patientName"]');
@@ -3250,17 +4253,32 @@
     document.querySelectorAll("[data-well-app]").forEach(initWell);
   }
 
-  window.CognationWellApplySide = function (side) {
+  var wellGlobal = typeof window !== "undefined" ? window : globalThis;
+  wellGlobal.CognationWellApplySide = function (side) {
+    if (typeof document === "undefined") return;
     document.querySelectorAll("[data-well-app]").forEach(function (root) {
       applyWellSide(root, side);
     });
   };
-  window.CognationWellPortalStore = PortalStore;
-  window.CognationWellCall = WellCall;
+  wellGlobal.CognationWellPortalStore = PortalStore;
+  wellGlobal.CognationWellCall = WellCall;
+  wellGlobal.CognationWellCalendar = {
+    firstAvailableSlots: firstAvailableSlots,
+    demoOutlookEvents: demoOutlookEvents,
+    connectCalendar: connectCalendar,
+    disconnectCalendar: disconnectCalendar,
+    outlookConnected: outlookConnected,
+    slotIsBlocked: slotIsBlocked,
+    ensureCalendarPrefs: ensureCalendarPrefs,
+    CalendarAdapters: CalendarAdapters,
+    VISIT_TYPES: VISIT_TYPES,
+  };
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", boot);
-  } else {
-    boot();
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", boot);
+    } else {
+      boot();
+    }
   }
 })();
