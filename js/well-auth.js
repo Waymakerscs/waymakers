@@ -37,22 +37,22 @@
 
   var COPY = {
     patient: {
-      eyebrow: "Patient lock",
+      eyebrow: "Your appointments",
       title: "Patient sign-in",
-      desc: "This opens the Patient portal only. Provider stays locked until you sign in on that side. Separate from WAYMAKERS site sign-in.",
+      desc: "Your own doctor appointments. This opens the Patient portal only. Work hours on the Provider side stay locked until you sign in there. Separate from WAYMAKERS site sign-in.",
       unlock: "Unlock Patient",
       lock: "Lock Patient",
       chip: "Patient session",
-      lockedMsg: "Patient locked. Sign in again on the Patient side. Provider is unchanged.",
+      lockedMsg: "Patient locked. Sign in again for your own doctor appointments. Work hours are unchanged.",
     },
     provider: {
-      eyebrow: "Provider lock",
+      eyebrow: "Work hours",
       title: "Provider sign-in",
-      desc: "This opens the Provider portal only. Patient stays locked until you sign in on that side. Separate from WAYMAKERS site sign-in.",
+      desc: "Work hours for the staff schedule. This opens the Provider portal only. Your own doctor appointments stay locked until you sign in on the Patient side. Separate from WAYMAKERS site sign-in.",
       unlock: "Unlock Provider",
       lock: "Lock Provider",
       chip: "Provider session",
-      lockedMsg: "Provider locked. Sign in again on the Provider side. Patient is unchanged.",
+      lockedMsg: "Provider locked. Sign in again for work hours. Your own doctor appointments are unchanged.",
     },
   };
 

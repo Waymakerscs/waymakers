@@ -652,6 +652,11 @@ assert.match(page, /data-well-auth-form="credentials"/);
 assert.match(page, /data-well-auth-side="patient"/);
 assert.match(page, /data-well-auth-side="provider"/);
 assert.match(page, /Unlocking one side does not open the other/);
+assert.match(page, /your own doctor appointments/);
+assert.match(page, /Work hours on the Provider side stay locked/);
+assert.match(client, /Your own doctor appointments\. This opens the Patient portal only/);
+assert.match(client, /Work hours for the staff schedule\. This opens the Provider portal only/);
+assert.match(client, /Your own doctor appointments stay locked until you sign in on the Patient side/);
 assert.equal(/Patient and Provider stay locked until/.test(page), false);
 assert.equal(/Second authentication lock/.test(page), false);
 for (const doc of [readme, fnReadme, sourceOfTruth]) {
