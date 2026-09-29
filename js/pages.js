@@ -1,11 +1,15 @@
 /**
- * PAGES — Cognation Yellow Pages (local business directory).
+ * PAGES — WAYMAKERS Yellow Pages.
  *
- * Demo seed data only. Live Google Places / Maps needs a free backend later
- * (same constraint as Nationwide news — do NOT call paid Google APIs from the client).
+ * Live listings come from GET /api/pages (Cloudflare Pages Function), which
+ * calls Google Places. This file never calls Google and never holds an API key.
+ * The key name is documented in functions/README.md.
  *
- * Swap path: implement fetchPagesListings(category, query) against your backend;
- * renderPages() already consumes that Promise.
+ * Without the key, the Function fails closed: empty results and a
+ * "not configured" message. The Chicago sample catalog is not a stand-in
+ * for nearby. It loads only for ?pagesDemo=1, still requires this device's
+ * location, and still stays inside 25 miles — so an Oklahoma device does not
+ * see Chicago samples. Site demo unlock (?demo=1) does not open that catalog.
  */
 (function () {
   "use strict";
@@ -129,16 +133,182 @@
 
   var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
+  function placesApi() {
+    if (typeof window !== "undefined" && window.WaymakersPagesPlaces) {
+      return window.WaymakersPagesPlaces;
+    }
+    if (typeof globalThis !== "undefined" && globalThis.WaymakersPagesPlaces) {
+      return globalThis.WaymakersPagesPlaces;
+    }
+    return null;
+  }
+
+  function pageSearch() {
+    try {
+      if (typeof location !== "undefined" && location && typeof location.search === "string") {
+        return location.search;
+      }
+    } catch (e) {}
+    return "";
+  }
+
+  function pageSession() {
+    try {
+      if (typeof sessionStorage !== "undefined" && sessionStorage) return sessionStorage;
+    } catch (e) {}
+    return null;
+  }
+
+  function demoGateOn() {
+    var places = placesApi();
+    if (!places || typeof places.isDemoEnabled !== "function") return false;
+    return places.isDemoEnabled(pageSearch(), pageSession());
+  }
+
+  function syncDemoGate() {
+    var places = placesApi();
+    if (!places || typeof places.persistDemoGate !== "function") return;
+    places.persistDemoGate(pageSearch(), pageSession());
+  }
+
+  function fetchPagesPayload(lat, lng, query, category) {
+    var places = placesApi();
+    var url = places
+      ? places.buildPagesUrl(lat, lng, query, category)
+      : "/api/pages?lat=" + encodeURIComponent(lat) + "&lng=" + encodeURIComponent(lng);
+    return fetch(url, { headers: { Accept: "application/json" } }).then(function (res) {
+      return res.json().catch(function () {
+        return null;
+      }).then(function (body) {
+        // A missing Function (static preview, or Pages before this route ships)
+        // is the same fail-closed state as a host with no API key. Google's own
+        // errors are translated by the Function and are not 404s.
+        if (res.status === 404) {
+          return {
+            ok: false,
+            configured: false,
+            mode: "unconfigured",
+            listings: [],
+            message:
+              "Google Places is not configured. Waymakers will not show demo listings as businesses near you.",
+          };
+        }
+        if (!body || typeof body !== "object") {
+          return { ok: false, configured: true, mode: "error", listings: [] };
+        }
+        return body;
+      });
+    }).catch(function () {
+      return { ok: false, configured: true, mode: "error", listings: [] };
+    });
+  }
+
   /**
-   * Stub for a later free Google Places / Maps backend.
-   * TODO: live Google local fetch needs free backend later (do not call paid Google APIs from the browser).
-   * @param {string} category - category filter or "All categories"
-   * @param {string} query - name/keyword search
-   * @returns {Promise<Array>}
+   * @param {string} category
+   * @param {string} query
+   * @param {{ok?:boolean, lat?:number, lng?:number, reason?:string}|null} userLocation
+   * @returns {Promise<{mode:string, listings:Array, located:boolean, showRetry:boolean, message:string, footer:string}>}
    */
-  function fetchPagesListings(category, query) {
-    // Demo path — filter local seed. Replace body with fetch('/api/pages?...') when backend exists.
-    return Promise.resolve(filterDemoListings(category, query));
+  function loadPagesView(category, query, userLocation) {
+    var places = placesApi();
+    var nearby = nearbyApi();
+    var demoOn = demoGateOn();
+    var radius = nearby && nearby.RADIUS_MILES ? nearby.RADIUS_MILES : 25;
+
+    if (!userLocation || userLocation.ok !== true) {
+      var pending = nearby
+        ? nearby.nearbyResult([], userLocation)
+        : {
+            listings: [],
+            located: false,
+            showRetry: true,
+            message:
+              "Location is unavailable. Turn on location services for this browser and try again. Waymakers will not show a default city.",
+          };
+      return Promise.resolve({
+        mode: "location",
+        listings: [],
+        located: false,
+        showRetry: pending.showRetry,
+        message: pending.message,
+        footer: demoOn ? "demo" : "idle",
+      });
+    }
+
+    if (demoOn) {
+      var samples = filterDemoListings(category, query).map(function (item) {
+        var copy = {};
+        Object.keys(item).forEach(function (key) {
+          copy[key] = item[key];
+        });
+        copy.source = "demo";
+        return copy;
+      });
+      var demoView = nearby
+        ? nearby.nearbyResult(samples, userLocation)
+        : { listings: [], radiusMiles: radius };
+      return Promise.resolve({
+        mode: "demo",
+        listings: demoView.listings || [],
+        located: true,
+        showRetry: false,
+        message: places
+          ? places.demoMessage((demoView.listings || []).length, demoView.radiusMiles || radius)
+          : "Demo catalog only — not live Google Places.",
+        footer: "demo",
+      });
+    }
+
+    if (!places) {
+      return Promise.resolve({
+        mode: "unconfigured",
+        listings: [],
+        located: true,
+        showRetry: false,
+        message:
+          "Google Places is not configured. Waymakers will not show demo listings as businesses near you.",
+        footer: "unconfigured",
+      });
+    }
+
+    return fetchPagesPayload(userLocation.lat, userLocation.lng, query, category).then(function (payload) {
+      var source = places.selectPagesSource({
+        demoEnabled: false,
+        payload: payload,
+        demoListings: DEMO_LISTINGS,
+      });
+      if (source.mode !== "places") {
+        return {
+          mode: source.mode,
+          listings: [],
+          located: true,
+          showRetry: false,
+          message: source.message,
+          footer: source.mode === "unconfigured" ? "unconfigured" : "error",
+        };
+      }
+      var live = nearby
+        ? nearby.nearbyResult(source.listings, userLocation)
+        : { listings: source.listings, message: source.message, radiusMiles: radius };
+      return {
+        mode: "places",
+        listings: live.listings || [],
+        located: true,
+        showRetry: false,
+        message: live.message || source.message,
+        footer: "places",
+      };
+    });
+  }
+
+  function fetchPagesListings(category, query, location) {
+    var loc = location || null;
+    if (loc && loc.ok !== true && isFinite(loc.lat) && isFinite(loc.lng)) {
+      loc = { ok: true, lat: loc.lat, lng: loc.lng };
+    }
+    return loadPagesView(category, query, loc).then(function (view) {
+      return view.listings || [];
+    });
   }
 
   function filterDemoListings(category, query) {
@@ -375,6 +545,7 @@
         var li = document.createElement("li");
         li.className = "pages-listing";
         if (hasJobsLink(item)) li.classList.add("pages-listing--has-jobs");
+        if (item.source) li.setAttribute("data-pages-source", item.source);
         var addressText = listingAddressText(item);
         var addressHtml = addressText
           ? '<span class="pages-address">' + escapeHtml(addressText) + "</span>"
@@ -388,29 +559,35 @@
           distanceHtml =
             '<span class="pages-distance">' + escapeHtml(milesLabel) + " mi</span>";
         }
+        var phoneDigits = String(item.phone || "").replace(/[^\d+]/g, "");
+        var phoneHtml = phoneDigits
+          ? '<a class="pages-phone" href="tel:' +
+            escapeHtml(phoneDigits) +
+            '">' +
+            escapeHtml(item.phone) +
+            "</a>"
+          : "";
+        var neighborhoodHtml = item.neighborhood
+          ? '<span class="pages-neighborhood">' + escapeHtml(item.neighborhood) + "</span>"
+          : "";
+        var blurbHtml = item.blurb
+          ? '<p class="pages-listing-blurb">' + escapeHtml(item.blurb) + "</p>"
+          : "";
         li.innerHTML =
           '<div class="pages-listing-row">' +
           '<span class="pages-chip">' +
-          escapeHtml(item.category) +
+          escapeHtml(item.category || "Local") +
           "</span>" +
           '<strong class="pages-listing-name">' +
           escapeHtml(item.name) +
           "</strong>" +
           "</div>" +
-          '<p class="pages-listing-blurb">' +
-          escapeHtml(item.blurb) +
-          "</p>" +
+          blurbHtml +
           '<p class="pages-listing-meta">' +
-          '<a class="pages-phone" href="tel:' +
-          escapeHtml(String(item.phone).replace(/[^\d+]/g, "")) +
-          '">' +
-          escapeHtml(item.phone) +
-          "</a>" +
+          phoneHtml +
           addressHtml +
           distanceHtml +
-          '<span class="pages-neighborhood">' +
-          escapeHtml(item.neighborhood) +
-          "</span>" +
+          neighborhoodHtml +
           "</p>";
         appendListingActions(li, item);
         ul.appendChild(li);
@@ -434,77 +611,54 @@
     var locationBox = root.querySelector("[data-pages-location]");
     var locationMessage = root.querySelector("[data-pages-location-message]");
     var locationRetry = root.querySelector("[data-pages-location-retry]");
+    var footer = root.querySelector("[data-pages-footer]");
     var userLocation = null;
-    var searchEmptyText = empty.textContent;
+    var requestSeq = 0;
+    var searchTimer = null;
 
     buildCategoryOptions(category);
     if (az) buildAzBar(az, {});
+    syncDemoGate();
 
     function showLocation(view) {
       if (locationMessage) locationMessage.textContent = view.message || "";
-      if (locationBox) locationBox.hidden = !view.message;
+      if (locationBox) {
+        locationBox.hidden = !view.message;
+        locationBox.classList.toggle("pages-location--demo", view.footer === "demo");
+        locationBox.classList.toggle("pages-location--unconfigured", view.footer === "unconfigured");
+        locationBox.setAttribute("data-pages-location-state", view.mode || "");
+      }
       if (locationRetry) locationRetry.hidden = !view.showRetry;
+      if (footer) {
+        var places = placesApi();
+        footer.textContent = places ? places.footerText(view.footer) : footer.textContent;
+      }
+    }
+
+    function paint(view) {
+      showLocation(view);
+      var shown = view.listings || [];
+      if (!view.located || !shown.length) {
+        results.innerHTML = "";
+        results.hidden = true;
+        empty.hidden = true;
+        if (countEl) countEl.textContent = "";
+        if (az) buildAzBar(az, {});
+        return;
+      }
+      if (countEl) {
+        countEl.textContent = shown.length === 1 ? "1 listing" : shown.length + " listings";
+      }
+      renderListings(results, empty, shown);
     }
 
     function refresh() {
+      var seq = ++requestSeq;
       var cat = category.value;
       var q = search.value;
-      var api = nearbyApi();
-      fetchPagesListings(cat, "").then(function (listings) {
-        var view = api
-          ? api.nearbyResult(listings, userLocation)
-          : {
-              listings: [],
-              located: false,
-              showRetry: true,
-              message:
-                "Location is unavailable. Turn on location services for this browser and try again. Waymakers will not show a default city.",
-            };
-        showLocation(view);
-        if (!view.located) {
-          results.innerHTML = "";
-          results.hidden = true;
-          empty.hidden = true;
-          if (countEl) countEl.textContent = "";
-          if (az) buildAzBar(az, {});
-          return;
-        }
-        var shown = filterDemoListings(cat, q).filter(function (item) {
-          return view.listings.some(function (nearItem) {
-            return nearItem.name === item.name;
-          });
-        }).map(function (item) {
-          var nearItem = view.listings.filter(function (candidate) {
-            return candidate.name === item.name;
-          })[0];
-          var copy = {};
-          Object.keys(item).forEach(function (key) {
-            copy[key] = item[key];
-          });
-          if (nearItem) copy.distanceMiles = nearItem.distanceMiles;
-          return copy;
-        });
-        shown.sort(function (a, b) {
-          return a.distanceMiles - b.distanceMiles;
-        });
-        if (countEl) {
-          countEl.textContent =
-            shown.length === 1 ? "1 listing" : shown.length + " listings";
-        }
-        if (!shown.length) {
-          results.innerHTML = "";
-          results.hidden = true;
-          if (view.listings.length) {
-            empty.hidden = false;
-            empty.textContent = searchEmptyText;
-          } else {
-            empty.hidden = true;
-          }
-          if (az) buildAzBar(az, {});
-          return;
-        }
-        empty.textContent = searchEmptyText;
-        renderListings(results, empty, shown);
+      loadPagesView(cat, q, userLocation).then(function (view) {
+        if (seq !== requestSeq) return;
+        paint(view);
       });
     }
 
@@ -538,8 +692,14 @@
       );
     }
 
-    search.addEventListener("input", refresh);
-    category.addEventListener("change", refresh);
+    search.addEventListener("input", function () {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(refresh, 250);
+    });
+    category.addEventListener("change", function () {
+      if (searchTimer) clearTimeout(searchTimer);
+      refresh();
+    });
     if (locationRetry) locationRetry.addEventListener("click", askLocation);
     askLocation();
   }
@@ -553,6 +713,7 @@
   root.CognationPagesDemo = DEMO_LISTINGS;
   root.WaymakersPages = {
     directionsHref: listingDirectionsHref,
+    loadPagesView: loadPagesView,
   };
 
   if (typeof document !== "undefined") {

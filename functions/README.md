@@ -1,5 +1,26 @@
 # Waymakers Pages Functions
 
+## `GET /api/pages`
+
+Google Places for the PAGES tab. The browser calls this Function only. It does not call `places.googleapis.com` or `maps.googleapis.com`.
+
+| Variable | Purpose |
+| --- | --- |
+| `GOOGLE_PLACES_API_KEY` | Places API (New) key. Set it in Cloudflare Pages → **waymakers** → Settings → Environment variables. Never commit it, and never put it in client JS. |
+
+This Function reads **only** `GOOGLE_PLACES_API_KEY`. A blank value is treated as unset.
+
+Query: `lat`, `lng`, optional `q` (keyword), optional `category` (PAGES category label). Radius is fixed at **25 miles** (40233.6 meters). A caller-supplied radius is ignored.
+
+- No key: `200` `{ ok: false, configured: false, mode: "unconfigured", listings: [] }` and the message that Google Places is not configured. Google is not called. The Chicago sample catalog is not returned.
+- Key plus lat/lng: Nearby Search (`places:searchNearby`) when browsing or filtering by a known place type. Text Search (`places:searchText`) when `q` is set, or when the category has no Places type (daycare, groomer, handyman, house cleaner, landscaper). Results farther than 25 miles are dropped.
+- Google error or a non-JSON body: `502`, `listings: []`, message that Places is unavailable. No demo fallback.
+- The key is sent only as the `X-Goog-Api-Key` header to Google. It is not written into the JSON response.
+
+Enable **Places API (New)** on the Google Cloud key. The field mask asks for id, display name, formatted address, national phone number, location, and primary type.
+
+Logic checks: `node functions/api/pages.test.mjs`.
+
 ## `POST /api/well-auth`
 
 Separate second locks for the WELL Patient and Provider portals. Separate from WAYMAKERS site sign-in. A Patient unlock does not open Provider, and the reverse.

@@ -481,8 +481,8 @@
                   <span class="pages-count" data-pages-count aria-live="polite"></span>
                 </div>
 
-                <div class="pages-location" data-pages-location>
-                  <p class="pages-location-message" data-pages-location-message>Checking your location to find businesses near you.</p>
+                <div class="pages-location" data-pages-location data-pages-location-state="location">
+                  <p class="pages-location-message" data-pages-location-message aria-live="polite">Checking your location to find businesses near you.</p>
                   <button type="button" class="pages-location-retry" data-pages-location-retry hidden>Try again</button>
                 </div>
 
@@ -493,7 +493,7 @@
                   <p class="pages-empty" data-pages-empty hidden>No listings match. Try another category or keyword.</p>
                 </div>
 
-                <p class="pages-footer-note">Powered by demo listings · Google local coming</p>
+                <p class="pages-footer-note" data-pages-footer>Nearby results come from Google Places after you share your location.</p>
               </div>
             </div>
 
@@ -579,6 +579,7 @@
   <script src="js/well-auth.js" defer></script>
   <script src="js/pages-directions.js" defer></script>
   <script src="js/pages-nearby.js" defer></script>
+  <script src="js/pages-places.js" defer></script>
   <script src="js/pages.js" defer></script>
   <script src="js/jobs-adapters.js" defer></script>
   <script src="js/jobs.js" defer></script>

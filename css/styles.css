@@ -3506,6 +3506,14 @@ body.login-gate-open .app-topbar {
   outline-offset: 2px;
 }
 
+.pages-location--demo {
+  background: rgba(244, 228, 166, 0.72);
+}
+
+.pages-location--unconfigured {
+  background: rgba(255, 254, 245, 0.95);
+}
+
 .pages-neighborhood {
   color: var(--pages-ink-soft);
   font-weight: 600;
