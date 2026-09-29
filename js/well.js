@@ -4,6 +4,8 @@
  * Two portals: Patient (fillable documentation + portal inbox/notes)
  *            | Provider (chart view; compose doctor messages + append-only notes)
  * sessionStorage: cognation.well.side = patient|provider
+ * WELL sign-in is per side (js/well-auth.js). Switching portals does not
+ * reuse the other side's session.
  * localStorage:   cognation.well.portal.v1  (demo chart + prefs — stays in this browser)
  * IndexedDB:      cognation.well.applehealth.v1 (Apple Health export file bytes)
  *
@@ -832,6 +834,11 @@
       renderPatient(root, PortalStore.get());
     }
     WellCall.setActiveRole(side);
+    try {
+      document.dispatchEvent(
+        new CustomEvent("cognation:well-side", { detail: { side: side } })
+      );
+    } catch (e) {}
   }
 
   function initSideToggle(root) {

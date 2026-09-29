@@ -106,7 +106,18 @@ Adapter: `js/well-calendar-connect.js` (`WellCalendarConnect.useAdapter` is the 
 - Project ref: `gjrxweezprhiosqewiah` (org COG-NATION) — **separate from Cognation**
 - Browser config: `js/cognation-config.js` → `https://gjrxweezprhiosqewiah.supabase.co`
 - Site sign-in is WAYMAKERS Supabase. Local demo of the site shell is `?demo=1` or **Demo unlock** (`waymakers.demo.unlock.v1`). That does not unlock WELL.
-- WELL is a second lock: username, password, then a one-time code. `POST /api/well-auth` checks `WELL_AUTH_USERS` and `WELL_AUTH_PASSWORD` from Cloudflare Pages env. No WELL password or fixed code ships in static assets. Patient and Provider are sides of the chart after that lock opens. The chart is still a demo EHR, not HIPAA; PHI must not leave the browser.
+- WELL has two second locks, one per portal. `POST /api/well-auth` requires `side` (`patient` or `provider`) on the password step and the one-time-code step. Challenge tickets are bound to that side. Unlocking Patient does not open Provider. No WELL password or fixed code ships in static assets. The chart is still a demo EHR, not HIPAA; PHI must not leave the browser.
+- Cloudflare Pages env (never commit the values):
+
+  | Variable | Purpose |
+  | --- | --- |
+  | `WELL_AUTH_PATIENT_USERS` | Comma-separated Patient usernames |
+  | `WELL_AUTH_PATIENT_PASSWORD` | Patient password. Checked on the server. |
+  | `WELL_AUTH_PROVIDER_USERS` | Comma-separated Provider usernames |
+  | `WELL_AUTH_PROVIDER_PASSWORD` | Provider password. Checked on the server. |
+  | `WELL_AUTH_SECRET` | Optional shared HMAC key for challenge tickets |
+
+  The same person may be listed on both sides with different passwords. Legacy `WELL_AUTH_USERS` / `WELL_AUTH_PASSWORD` are not read. If only those remain, each side fails closed with “WELL sign-in is not configured for this side,” so the old shared password cannot open both portals. Sessions live in `cognation.well.auth.patient.v1` and `cognation.well.auth.provider.v1`. Lock Patient / Lock Provider clears that side only. Site sign-out clears both. The old shared key `cognation.well.auth.v1` is discarded and does not grant either side.
 
 ## Related
 
