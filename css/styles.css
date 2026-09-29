@@ -11643,9 +11643,9 @@ body:has(.waymakers-masthead) .site-header {
   #main .tabs-section { margin-top: -0.2rem; }
 }
 
-/* Holographic north star — under-mark for the WAYMAKERS wordmark.
-   Idle is a static gem plus a quiet flare. Hover on the wordmark
-   brightens the flare and sweeps a sheen. No idle loop. */
+/* Holographic north star — quiet faceted gem under the WAYMAKERS wordmark.
+   Idle is a calm halo and a slow sheen. Hover brightens that shimmer only.
+   No compass rays. prefers-reduced-motion freezes the sheen. */
 .wm-wordmark {
   position: relative;
 }
@@ -11672,11 +11672,18 @@ body:has(.waymakers-masthead) .site-header {
   content: "";
   position: absolute;
   z-index: 0;
-  inset: 8% 10%;
+  inset: 16% 18%;
   border-radius: 50%;
   pointer-events: none;
-  background: radial-gradient(ellipse, rgba(125, 239, 255, 0.62), rgba(196, 132, 252, 0.32) 46%, transparent 72%);
-  filter: blur(16px);
+  background: radial-gradient(
+    ellipse,
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(190, 224, 242, 0.34) 38%,
+    rgba(226, 198, 232, 0.2) 58%,
+    transparent 76%
+  );
+  filter: blur(14px);
+  transition: background 280ms ease;
 }
 
 .login-gate-brand--splash .wm-north-star {
@@ -11692,55 +11699,10 @@ body:has(.waymakers-masthead) .site-header {
   width: 100%;
   height: 100%;
   filter:
-    drop-shadow(0 1px 1px rgba(15, 23, 42, 0.4))
-    drop-shadow(0 0 16px rgba(125, 239, 255, 0.82))
-    drop-shadow(0 0 42px rgba(199, 140, 255, 0.55));
-  transition: filter 220ms ease;
-}
-
-.wm-north-star-rays {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  z-index: 0;
-  width: 146%;
-  height: 146%;
-  transform: translate(-50%, -50%);
-  opacity: 0.42;
-  pointer-events: none;
-  background: conic-gradient(
-    from 0deg,
-    rgba(255, 255, 255, 0.95) 0deg,
-    rgba(34, 211, 238, 0.95) 4deg,
-    transparent 10deg,
-    transparent 39deg,
-    rgba(244, 114, 182, 0.7) 45deg,
-    transparent 51deg,
-    transparent 84deg,
-    rgba(255, 255, 255, 0.75) 90deg,
-    rgba(167, 139, 250, 0.8) 94deg,
-    transparent 101deg,
-    transparent 129deg,
-    rgba(251, 191, 36, 0.65) 135deg,
-    transparent 142deg,
-    transparent 174deg,
-    rgba(34, 211, 238, 0.55) 180deg,
-    transparent 187deg,
-    transparent 219deg,
-    rgba(232, 121, 249, 0.45) 225deg,
-    transparent 232deg,
-    transparent 264deg,
-    rgba(186, 230, 253, 0.7) 270deg,
-    transparent 277deg,
-    transparent 309deg,
-    rgba(253, 224, 71, 0.5) 315deg,
-    transparent 322deg,
-    transparent 350deg,
-    rgba(255, 255, 255, 0.95) 360deg
-  );
-  -webkit-mask-image: radial-gradient(circle, transparent 0 26%, #000 44%, #000 58%, transparent 76%);
-  mask-image: radial-gradient(circle, transparent 0 26%, #000 44%, #000 58%, transparent 76%);
-  transition: opacity 220ms ease;
+    drop-shadow(0 1px 1px rgba(36, 48, 68, 0.28))
+    drop-shadow(0 0 12px rgba(186, 214, 236, 0.55))
+    drop-shadow(0 0 26px rgba(214, 186, 224, 0.28));
+  transition: filter 280ms ease;
 }
 
 .wm-north-star-sheen {
@@ -11748,17 +11710,18 @@ body:has(.waymakers-masthead) .site-header {
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  opacity: 0.38;
+  opacity: 0.42;
   background: linear-gradient(
-    115deg,
-    transparent 32%,
-    rgba(255, 255, 255, 0.15) 42%,
-    rgba(255, 255, 255, 0.92) 50%,
-    rgba(125, 243, 255, 0.45) 56%,
-    transparent 68%
+    112deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.18) 44%,
+    rgba(255, 255, 255, 0.82) 50%,
+    rgba(214, 236, 246, 0.42) 54%,
+    rgba(244, 214, 230, 0.22) 58%,
+    transparent 66%
   );
-  background-size: 220% 100%;
-  background-position: 72% 0;
+  background-size: 240% 100%;
+  background-position: 100% 0;
   mix-blend-mode: soft-light;
   -webkit-mask-image: url("../assets/wm-north-star.svg");
   mask-image: url("../assets/wm-north-star.svg");
@@ -11768,37 +11731,38 @@ body:has(.waymakers-masthead) .site-header {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
+  animation: wm-star-sheen 16s ease-in-out infinite alternate;
 }
 
 .wm-wordmark:hover .wm-north-star::before,
 .wm-wordmark:focus-visible .wm-north-star::before {
-  background: radial-gradient(ellipse, rgba(210, 252, 255, 0.85), rgba(216, 160, 255, 0.5) 42%, rgba(251, 191, 36, 0.22) 64%, transparent 78%);
+  background: radial-gradient(
+    ellipse,
+    rgba(255, 255, 255, 0.88) 0%,
+    rgba(198, 228, 244, 0.46) 36%,
+    rgba(230, 204, 236, 0.28) 58%,
+    transparent 78%
+  );
 }
 
 .wm-wordmark:hover .wm-north-star-img,
 .wm-wordmark:focus-visible .wm-north-star-img {
   filter:
-    drop-shadow(0 1px 1px rgba(15, 23, 42, 0.45))
-    drop-shadow(0 0 8px rgba(255, 255, 255, 0.95))
-    drop-shadow(0 0 22px rgba(125, 239, 255, 0.95))
-    drop-shadow(0 0 58px rgba(199, 140, 255, 0.78))
-    drop-shadow(0 0 78px rgba(251, 191, 36, 0.4));
-}
-
-.wm-wordmark:hover .wm-north-star-rays,
-.wm-wordmark:focus-visible .wm-north-star-rays {
-  opacity: 0.92;
+    drop-shadow(0 1px 1px rgba(36, 48, 68, 0.3))
+    drop-shadow(0 0 10px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 0 18px rgba(186, 220, 238, 0.62))
+    drop-shadow(0 0 32px rgba(214, 186, 224, 0.36));
 }
 
 .wm-wordmark:hover .wm-north-star-sheen,
 .wm-wordmark:focus-visible .wm-north-star-sheen {
-  opacity: 0.95;
-  animation: wm-star-sheen 1.8s ease-in-out infinite;
+  opacity: 0.72;
+  animation-duration: 9s;
 }
 
 @keyframes wm-star-sheen {
-  0% { background-position: 130% 0; }
-  100% { background-position: -40% 0; }
+  from { background-position: 118% 0; }
+  to { background-position: -18% 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -11808,34 +11772,37 @@ body:has(.waymakers-masthead) .site-header {
   }
 
   .wm-north-star-img,
-  .wm-north-star-rays,
-  .wm-north-star-sheen {
+  .wm-north-star-sheen,
+  .wm-north-star::before {
     transition: none;
     animation: none;
   }
 
-  .wm-wordmark:hover .wm-north-star::before,
-  .wm-wordmark:focus-visible .wm-north-star::before {
-    background: radial-gradient(ellipse, rgba(125, 239, 255, 0.62), rgba(196, 132, 252, 0.32) 46%, transparent 72%);
-  }
-
+  .wm-north-star-sheen,
   .wm-wordmark:hover .wm-north-star-sheen,
   .wm-wordmark:focus-visible .wm-north-star-sheen {
     animation: none;
-    opacity: 0.38;
+    opacity: 0.36;
+    background-position: 46% 0;
   }
 
-  .wm-wordmark:hover .wm-north-star-rays,
-  .wm-wordmark:focus-visible .wm-north-star-rays {
-    opacity: 0.42;
+  .wm-wordmark:hover .wm-north-star::before,
+  .wm-wordmark:focus-visible .wm-north-star::before {
+    background: radial-gradient(
+      ellipse,
+      rgba(255, 255, 255, 0.72) 0%,
+      rgba(190, 224, 242, 0.34) 38%,
+      rgba(226, 198, 232, 0.2) 58%,
+      transparent 76%
+    );
   }
 
   .wm-wordmark:hover .wm-north-star-img,
   .wm-wordmark:focus-visible .wm-north-star-img {
     filter:
-      drop-shadow(0 1px 1px rgba(15, 23, 42, 0.4))
-      drop-shadow(0 0 16px rgba(125, 239, 255, 0.82))
-      drop-shadow(0 0 42px rgba(199, 140, 255, 0.55));
+      drop-shadow(0 1px 1px rgba(36, 48, 68, 0.28))
+      drop-shadow(0 0 12px rgba(186, 214, 236, 0.55))
+      drop-shadow(0 0 26px rgba(214, 186, 224, 0.28));
   }
 }
 
