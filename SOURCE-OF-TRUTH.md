@@ -9,7 +9,7 @@ Canonical product, deploy target, and what must stay separate from Cognation.
 | GitHub | [`Waymakerscs/waymakers`](https://github.com/Waymakerscs/waymakers) |
 | Cloudflare Pages project | `waymakers` |
 | Public site | `waymakers.pages.dev` |
-| Product surfaces | **CAREER · HOME · WELL · PAGES** |
+| Product surfaces | **CAREER · HOME · WELL · DESK · PAGES** |
 
 Canonical deploy path: **Waymakerscs/waymakers → `waymakers.pages.dev`.**
 
@@ -21,7 +21,7 @@ On the working machine, the product checkout is:
 
 `/workspace/waymakers`
 
-Deploy Pages from that CAREER / HOME / WELL / PAGES tree (this GitHub repository). Do not deploy from `waymakers-repo`.
+Deploy Pages from that CAREER / HOME / WELL / DESK / PAGES tree (this GitHub repository). Do not deploy from `waymakers-repo`.
 
 ## Split from Cognation
 
@@ -59,8 +59,9 @@ Two locks. They are not the same control.
 
 | Surface | Status |
 | --- | --- |
-| CAREER Indeed / LinkedIn | Deeplink only. `functions/api/jobs.js` is not a live listings API. |
+| CAREER Indeed / LinkedIn | Remote only. Fail closed until Pages env is set. Indeed mounts the official Publisher plugin after partner approval. LinkedIn has no job-search read API, so credentials still return no listings. No scrape and no substitute boards. |
 | CAREER Waymakers Apply | Local demo. Not a live application. |
 | Apple Health | Local demo · manual export only. No live HealthKit sync. |
 | HOME | Not live. Post-sign-in hub is still missing. |
+| DESK | Waymakers only, beside WELL. v1 is a blank white empty page. No copy, cards, or widgets. |
 | Express session service | Stub. Not the Pages session. |

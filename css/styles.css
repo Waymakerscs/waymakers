@@ -3452,6 +3452,68 @@ body.login-gate-open .app-topbar {
   outline: none;
 }
 
+.pages-address {
+  color: var(--pages-ink);
+  font-weight: 700;
+}
+
+.pages-distance {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pages-location {
+  margin: 0.75rem 0 0.35rem;
+  padding: 0.7rem 0.75rem;
+  border: 2px solid var(--pages-ink);
+  background: rgba(255, 254, 245, 0.85);
+}
+
+.pages-location-message {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--pages-ink);
+}
+
+.pages-location-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.55rem;
+  min-height: 1.85rem;
+  padding: 0.22rem 0.65rem;
+  font-family: "Times New Roman", Times, Georgia, serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 2px solid var(--pages-ink);
+  border-radius: 0;
+  cursor: pointer;
+  line-height: 1.2;
+  background: var(--pages-ink);
+  color: var(--pages-paper);
+}
+
+.pages-location-retry:hover,
+.pages-location-retry:focus-visible {
+  background: #fffef5;
+  color: var(--pages-ink);
+  outline: 2px solid var(--pages-ink);
+  outline-offset: 2px;
+}
+
+.pages-location--demo {
+  background: rgba(244, 228, 166, 0.72);
+}
+
+.pages-location--unconfigured {
+  background: rgba(255, 254, 245, 0.95);
+}
+
 .pages-neighborhood {
   color: var(--pages-ink-soft);
   font-weight: 600;
@@ -3475,7 +3537,8 @@ body.login-gate-open .app-topbar {
 }
 
 .pages-tower-link,
-.pages-call-btn {
+.pages-call-btn,
+.pages-directions-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3493,13 +3556,16 @@ body.login-gate-open .app-topbar {
   line-height: 1.2;
 }
 
-.pages-tower-link {
+.pages-tower-link,
+.pages-directions-link {
   background: transparent;
   color: var(--pages-ink);
 }
 
 .pages-tower-link:hover,
-.pages-tower-link:focus-visible {
+.pages-tower-link:focus-visible,
+.pages-directions-link:hover,
+.pages-directions-link:focus-visible {
   background: var(--pages-ink);
   color: var(--pages-paper);
   outline: none;
@@ -11601,6 +11667,17 @@ body:has(.waymakers-masthead) .site-header {
   outline: 2px solid var(--pages-ink);
   outline-offset: 2px;
 }
+.pages-directions-link {
+  background: transparent;
+  color: #0a0a0c;
+}
+.pages-directions-link:hover,
+.pages-directions-link:focus-visible {
+  background: #0a0a0c;
+  color: #f4f7fb;
+  outline: 2px solid #0a0a0c;
+  outline-offset: 2px;
+}
 .pages-listing--has-jobs .pages-chip {
   box-shadow: inset 0 0 0 1px rgba(244, 228, 166, 0.35);
 }
@@ -11828,6 +11905,58 @@ body:has(.waymakers-masthead) .site-header {
   font-size: 0.88rem;
   font-style: italic;
   opacity: 0.75;
+}
+.jobs-remote {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 0.9rem;
+}
+.jobs-remote[hidden] { display: none; }
+.jobs-local-heading {
+  margin: 0.2rem 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.jobs-local-heading[hidden] { display: none; }
+.jobs-source-status {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(30, 50, 80, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+.jobs-source-status--not_configured,
+.jobs-source-status--partner_blocked,
+.jobs-source-status--error {
+  border-color: rgba(160, 90, 20, 0.5);
+  background: rgba(255, 244, 230, 0.92);
+}
+.jobs-source-status__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.jobs-source-status__detail,
+.jobs-source-status__keys {
+  margin: 0.4rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.jobs-source-status__keys { font-weight: 750; }
+.jobs-source-status__docs {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 750;
+  color: inherit;
+}
+.jobs-indeed-plugin { margin-top: 0.75rem; }
+.jobs-chip--remote {
+  background: rgba(20, 90, 70, 0.12);
+  border-color: rgba(20, 90, 70, 0.4);
+  color: #0d4a38;
 }
 
 /* WELL — doctor notes + messaging */
@@ -12086,6 +12215,12 @@ dt, dd, figcaption, time, address, cite, dfn, abbr, q, s, mark,
 .jobs-hint,
 .jobs-footer-note,
 .jobs-filter-banner,
+.jobs-local-heading,
+.jobs-source-status,
+.jobs-source-status__title,
+.jobs-source-status__detail,
+.jobs-source-status__keys,
+.jobs-source-status__docs,
 .well-app,
 .pages-app,
 .jobs-shell,
@@ -12193,13 +12328,22 @@ textarea::placeholder {
 .jobs-apply-btn,
 .jobs-apply-btn--external,
 .pages-jobs-link,
+.pages-location-retry,
 .btn-primary {
   color: #f4f7fb !important;
 }
 
+.pages-location-retry {
+  background: #0a0a0c !important;
+  border-color: #0a0a0c !important;
+}
+
 .pages-jobs-link:hover,
-.pages-jobs-link:focus-visible {
+.pages-jobs-link:focus-visible,
+.pages-location-retry:hover,
+.pages-location-retry:focus-visible {
   color: #0a0a0c !important;
+  background: #fffef5 !important;
 }
 
 /* Keep silvery holo wordmark treatment (black glyphs + white glow) */
@@ -12263,4 +12407,23 @@ textarea::placeholder {
   background-image:
     linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12) 42%, rgba(180, 195, 215, 0.28)) !important;
   background-color: rgba(236, 242, 248, 0.72) !important;
+}
+
+/* DESK v1 — blank white empty page beside WELL. No copy, cards, or widgets. */
+#panel-desk.desk-blank {
+  min-height: 70vh;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  background: #fff !important;
+  background-color: #fff !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.tabs.tabs--chrome .tab-panels:has(#panel-desk:not([hidden])) {
+  background: #fff !important;
+  background-color: #fff !important;
+  background-image: none !important;
+  box-shadow: none !important;
 }

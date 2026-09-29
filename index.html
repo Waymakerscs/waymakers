@@ -257,6 +257,7 @@
           <div class="app-topbar">
             <div role="tablist" aria-label="WAYMAKERS topics" class="tablist">
               <button type="button" role="tab" id="tab-well" aria-controls="panel-well" aria-selected="true" tabindex="0">WELL</button>
+              <button type="button" role="tab" id="tab-desk" aria-controls="panel-desk" aria-selected="false" tabindex="-1">DESK</button>
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1">PAGES</button>
               <button type="button" role="tab" id="tab-home" aria-controls="panel-home" aria-selected="false" tabindex="-1">HOME</button>
               <button type="button" role="tab" id="tab-jobs" aria-controls="panel-jobs" aria-selected="false" tabindex="-1">CAREER</button>
@@ -455,6 +456,8 @@
               </div>
             </div>
 
+            <div role="tabpanel" id="panel-desk" class="desk-blank" aria-labelledby="tab-desk" hidden></div>
+
             <div role="tabpanel" id="panel-pages" aria-labelledby="tab-pages" hidden>
               <div class="pages-shell" data-pages-shell>
                 <header class="pages-intro">
@@ -478,6 +481,11 @@
                   <span class="pages-count" data-pages-count aria-live="polite"></span>
                 </div>
 
+                <div class="pages-location" data-pages-location data-pages-location-state="location">
+                  <p class="pages-location-message" data-pages-location-message aria-live="polite">Checking your location to find businesses near you.</p>
+                  <button type="button" class="pages-location-retry" data-pages-location-retry hidden>Try again</button>
+                </div>
+
                 <nav class="pages-az" data-pages-az aria-label="Jump to letter"></nav>
 
                 <div class="pages-book">
@@ -485,7 +493,7 @@
                   <p class="pages-empty" data-pages-empty hidden>No listings match. Try another category or keyword.</p>
                 </div>
 
-                <p class="pages-footer-note">Powered by demo listings · Google local coming</p>
+                <p class="pages-footer-note" data-pages-footer>Nearby results come from Google Places after you share your location.</p>
               </div>
             </div>
 
@@ -505,10 +513,10 @@
               <div class="jobs-shell" data-jobs-shell>
                 <header class="jobs-intro">
                   <h3 class="jobs-title">CAREER</h3>
-                  <p class="jobs-dek">Applicant board · local company openings plus Indeed / LinkedIn by location</p>
-                  <p class="jobs-role-note">Companies manage care work in WELL; openings to apply for are listed here.</p>
+                  <p class="jobs-dek">Remote jobs from LinkedIn Jobs and Indeed, plus Waymakers company openings.</p>
+                  <p class="jobs-role-note">Indeed and LinkedIn stay remote-only. They stay empty until Cloudflare Pages has the partner credentials — this board does not invent listings.</p>
                   <p class="jobs-deferral" role="note">
-                    Local demo. Waymakers Apply does not submit applications. Indeed and LinkedIn cards are deeplink only — the jobs API is not a live listings feed.
+                    Waymakers Apply does not submit applications. LinkedIn and Indeed need partner approval before remote listings can load.
                   </p>
                 </header>
 
@@ -516,7 +524,7 @@
                   <label class="jobs-sr-only" for="jobs-company">Filter by company</label>
                   <select id="jobs-company" class="jobs-company" data-jobs-company aria-label="Filter by company"></select>
                   <label class="jobs-sr-only" for="jobs-location">Location</label>
-                  <input type="search" id="jobs-location" class="jobs-location-input" data-jobs-location placeholder="City, region, or zip" autocomplete="address-level2" aria-label="Filter by location (city, region, or zip)" />
+                  <input type="search" id="jobs-location" class="jobs-location-input" data-jobs-location placeholder="City, region, or zip" autocomplete="address-level2" aria-label="City, region, or zip. Filters Waymakers openings. Added as a keyword on Indeed and LinkedIn without turning remote off." />
                   <label class="jobs-sr-only" for="jobs-source">Source</label>
                   <select id="jobs-source" class="jobs-source" data-jobs-source aria-label="Filter by source">
                     <option value="">All sources</option>
@@ -530,12 +538,14 @@
 
                 <p class="jobs-filter-banner" data-jobs-filter-banner hidden></p>
 
+                <div class="jobs-remote" data-jobs-remote aria-label="Remote jobs from Indeed and LinkedIn"></div>
+                <h4 class="jobs-local-heading" data-jobs-local-heading hidden>Waymakers openings</h4>
                 <div class="jobs-book">
                   <div class="jobs-results" data-jobs-results aria-label="Job openings"></div>
                   <p class="jobs-empty" data-jobs-empty hidden>No openings match.</p>
                 </div>
 
-                <p class="jobs-footer-note">Waymakers openings keyed by company id (WELL &amp; PAGES) · Indeed / LinkedIn: deeplink only, jobs API not live</p>
+                <p class="jobs-footer-note">Waymakers openings use company id (WELL &amp; PAGES). Indeed and LinkedIn are remote only and fail closed when they are not configured.</p>
               </div>
             </div>
           </div>
@@ -568,6 +578,9 @@
   <script src="js/well-chart-flow.js" defer></script>
   <script src="js/well.js" defer></script>
   <script src="js/well-auth.js" defer></script>
+  <script src="js/pages-directions.js" defer></script>
+  <script src="js/pages-nearby.js" defer></script>
+  <script src="js/pages-places.js" defer></script>
   <script src="js/pages.js" defer></script>
   <script src="js/jobs-adapters.js" defer></script>
   <script src="js/jobs.js" defer></script>
