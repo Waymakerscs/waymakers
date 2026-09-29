@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" fill="none" aria-hidden="true">
+  <defs>
+    <linearGradient id="nL" x1="0" y1="0" x2="0.15" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.38" stop-color="#d9fbff"/>
+      <stop offset="0.72" stop-color="#67e8f9"/>
+      <stop offset="1" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="nR" x1="1" y1="0" x2="0.2" y2="1">
+      <stop offset="0" stop-color="#f4fdff"/>
+      <stop offset="0.42" stop-color="#c4b5fd"/>
+      <stop offset="1" stop-color="#312e81"/>
+    </linearGradient>
+    <linearGradient id="neL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.4" stop-color="#ffe4f3"/>
+      <stop offset="1" stop-color="#f472b6"/>
+    </linearGradient>
+    <linearGradient id="neR" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#fae8ff"/>
+      <stop offset="0.55" stop-color="#e879f9"/>
+      <stop offset="1" stop-color="#6b21a8"/>
+    </linearGradient>
+    <linearGradient id="eU" x1="0" y1="0" x2="1" y2="0.4">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.45" stop-color="#ddd6fe"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="eD" x1="0" y1="1" x2="1" y2="0.2">
+      <stop offset="0" stop-color="#fae8ff"/>
+      <stop offset="0.5" stop-color="#a78bfa"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="seL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff7ed"/>
+      <stop offset="0.45" stop-color="#fcd34d"/>
+      <stop offset="1" stop-color="#c026d3"/>
+    </linearGradient>
+    <linearGradient id="seR" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="0.5" stop-color="#fb7185"/>
+      <stop offset="1" stop-color="#4c1d95"/>
+    </linearGradient>
+    <linearGradient id="sL" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e0e7ff"/>
+      <stop offset="0.5" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="sR" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ecfeff"/>
+      <stop offset="0.48" stop-color="#2dd4bf"/>
+      <stop offset="1" stop-color="#134e4a"/>
+    </linearGradient>
+    <linearGradient id="swL" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ecfeff"/>
+      <stop offset="0.5" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#155e75"/>
+    </linearGradient>
+    <linearGradient id="swR" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f0fdfa"/>
+      <stop offset="0.55" stop-color="#5eead4"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
+    </linearGradient>
+    <linearGradient id="wU" x1="1" y1="0" x2="0" y2="0.6">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.4" stop-color="#bae6fd"/>
+      <stop offset="1" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="wD" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#e0f2fe"/>
+      <stop offset="0.5" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="nwL" x1="1" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#fffbeb"/>
+      <stop offset="0.42" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="nwR" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.4" stop-color="#a5f3fc"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <radialGradient id="core" cx="0.38" cy="0.32" r="0.72">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.28" stop-color="#f8feff"/>
+      <stop offset="0.55" stop-color="#c4b5fd"/>
+      <stop offset="0.82" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.35" stop-color="#67e8f9"/>
+      <stop offset="0.62" stop-color="#f0abfc"/>
+      <stop offset="1" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Chromatic fringe so the gem reads on light and dark -->
+  <g opacity="0.55">
+    <path transform="translate(-1.4 0.6)" fill="#22d3ee" d="M100 14 108.42 79.67 131.11 68.89 120.33 91.58 178 100 120.33 108.42 131.11 131.11 108.42 120.33 100 176 91.58 120.33 68.89 131.11 79.67 108.42 22 100 79.67 91.58 68.89 68.89 91.58 79.67Z"/>
+    <path transform="translate(1.5 -0.5)" fill="#e879f9" d="M100 14 108.42 79.67 131.11 68.89 120.33 91.58 178 100 120.33 108.42 131.11 131.11 108.42 120.33 100 176 91.58 120.33 68.89 131.11 79.67 108.42 22 100 79.67 91.58 68.89 68.89 91.58 79.67Z"/>
+  </g>
+
+  <path fill="#0f172a" d="M100 14 108.42 79.67 131.11 68.89 120.33 91.58 178 100 120.33 108.42 131.11 131.11 108.42 120.33 100 176 91.58 120.33 68.89 131.11 79.67 108.42 22 100 79.67 91.58 68.89 68.89 91.58 79.67Z"/>
+
+  <!-- North, the long ray -->
+  <path fill="url(#nL)" d="M100 14 91.58 79.67 100 79.67Z"/>
+  <path fill="url(#nR)" d="M100 14 100 79.67 108.42 79.67Z"/>
+  <path fill="url(#neL)" d="M131.11 68.89 108.42 79.67 114.38 85.63Z"/>
+  <path fill="url(#neR)" d="M131.11 68.89 114.38 85.63 120.33 91.58Z"/>
+  <path fill="url(#eU)" d="M178 100 120.33 91.58 120.33 100Z"/>
+  <path fill="url(#eD)" d="M178 100 120.33 100 120.33 108.42Z"/>
+  <path fill="url(#seL)" d="M131.11 131.11 120.33 108.42 114.38 114.38Z"/>
+  <path fill="url(#seR)" d="M131.11 131.11 114.38 114.38 108.42 120.33Z"/>
+  <path fill="url(#sL)" d="M100 176 108.42 120.33 100 120.33Z"/>
+  <path fill="url(#sR)" d="M100 176 100 120.33 91.58 120.33Z"/>
+  <path fill="url(#swL)" d="M68.89 131.11 91.58 120.33 85.63 114.38Z"/>
+  <path fill="url(#swR)" d="M68.89 131.11 85.63 114.38 79.67 108.42Z"/>
+  <path fill="url(#wU)" d="M22 100 79.67 91.58 79.67 100Z"/>
+  <path fill="url(#wD)" d="M22 100 79.67 100 79.67 108.42Z"/>
+  <path fill="url(#nwL)" d="M68.89 68.89 79.67 91.58 85.63 85.63Z"/>
+  <path fill="url(#nwR)" d="M68.89 68.89 85.63 85.63 91.58 79.67Z"/>
+
+  <!-- Ridge lights -->
+  <g stroke="#ffffff" stroke-linecap="round" opacity="0.72">
+    <path d="M100 18 100 76" stroke-width="1.15"/>
+    <path d="M174 100 124 100" stroke-width="0.7" opacity="0.55"/>
+    <path d="M100 172 100 124" stroke-width="0.65" opacity="0.45"/>
+    <path d="M26 100 76 100" stroke-width="0.8"/>
+    <path d="M128.4 71.2 115.2 84.2" stroke-width="0.55" opacity="0.6"/>
+    <path d="M71.6 71.2 84.8 84.2" stroke-width="0.7"/>
+  </g>
+
+  <!-- Specular on the north face -->
+  <path fill="#ffffff" opacity="0.92" d="M100 22 97.1 48.5 100 43.2Z"/>
+  <path fill="#ffffff" opacity="0.38" d="M100 24 103.2 50 100 44Z"/>
+
+  <circle cx="100" cy="100" r="14.5" fill="url(#core)"/>
+  <circle cx="100" cy="100" r="14.5" fill="none" stroke="url(#rim)" stroke-width="1.15"/>
+  <circle cx="100" cy="100" r="8.2" fill="none" stroke="#ffffff" stroke-width="0.45" opacity="0.7"/>
+  <path fill="#ffffff" opacity="0.95" d="M100 91.2 101.15 98.15 108.1 99.3 101.15 100.45 100 107.4 98.85 100.45 91.9 99.3 98.85 98.15Z"/>
+  <circle cx="96.2" cy="95.4" r="1.35" fill="#ffffff" opacity="0.9"/>
+
+  <path fill="none" stroke="#0b1220" stroke-width="1.35" stroke-linejoin="round" d="M100 14 108.42 79.67 131.11 68.89 120.33 91.58 178 100 120.33 108.42 131.11 131.11 108.42 120.33 100 176 91.58 120.33 68.89 131.11 79.67 108.42 22 100 79.67 91.58 68.89 68.89 91.58 79.67Z"/>
+  <path fill="none" stroke="#ffffff" stroke-width="0.55" stroke-linejoin="round" opacity="0.75" d="M100 14 108.42 79.67 131.11 68.89 120.33 91.58 178 100 120.33 108.42 131.11 131.11 108.42 120.33 100 176 91.58 120.33 68.89 131.11 79.67 108.42 22 100 79.67 91.58 68.89 68.89 91.58 79.67Z"/>
+</svg>
