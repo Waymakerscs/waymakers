@@ -5880,6 +5880,28 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   color: var(--well-muted);
 }
 
+.well-auth-sides {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 0 0.45rem;
+  padding: 0.28rem;
+  border: 1px solid var(--well-line);
+  border-radius: 999px;
+  background: #f4f8fa;
+}
+
+.well-auth-sides .well-side-btn {
+  flex: 1;
+  text-align: center;
+}
+
+.well-auth-side-note {
+  margin: 0 0 0.85rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--well-muted);
+}
+
 .well-auth-steps {
   display: flex;
   gap: 0.4rem;
@@ -7503,7 +7525,9 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 
 
 [data-well-app][data-well-side="patient"] [data-well-provider-side],
-[data-well-app][data-well-side="provider"] [data-well-patient-side] {
+[data-well-app][data-well-side="provider"] [data-well-patient-side],
+[data-well-app][data-well-patient-auth="locked"] [data-well-patient-side],
+[data-well-app][data-well-provider-auth="locked"] [data-well-provider-side] {
   display: none !important;
 }
 

@@ -1,17 +1,26 @@
 /**
- * WELL second authentication lock (step-up).
+ * WELL second authentication locks (step-up), one per portal side.
  *
- * Separate from WAYMAKERS site sign-in. Patient and Provider stay locked
- * until both factors succeed:
- *   1. WELL username + password, checked by POST /api/well-auth
- *   2. the one-time code that endpoint issues for this attempt
+ * Separate from WAYMAKERS site sign-in. Patient and Provider do not share
+ * a session. Unlocking Patient does not open Provider, and the reverse.
+ * Each side needs its own username, password, and one-time code:
+ *   1. WELL username + password for that side, checked by POST /api/well-auth
+ *   2. the one-time code that endpoint issues for this attempt and this side
  *
  * No password and no fixed code ship in this file. Pages env holds
- * WELL_AUTH_USERS and WELL_AUTH_PASSWORD (see functions/api/well-auth.js).
- * Site demo unlock (?demo=1 / Demo unlock) does not open this lock.
+ * WELL_AUTH_PATIENT_USERS, WELL_AUTH_PATIENT_PASSWORD,
+ * WELL_AUTH_PROVIDER_USERS, and WELL_AUTH_PROVIDER_PASSWORD
+ * (see functions/api/well-auth.js). Legacy WELL_AUTH_USERS / WELL_AUTH_PASSWORD
+ * do not open either side. Site demo unlock (?demo=1 / Demo unlock) does not
+ * open these locks.
  *
- * Session: sessionStorage cognation.well.auth.v1 (clears on tab close).
- * Key name is Cognation naming debt — keep it so existing callers work.
+ * Sessions (cleared on tab close, soft TTL 4h):
+ *   cognation.well.auth.patient.v1
+ *   cognation.well.auth.provider.v1
+ * The older shared key cognation.well.auth.v1 is removed on boot and never
+ * grants either portal, so a leftover shared session cannot open both sides.
+ * Lock Patient / Lock Provider clears only that side.
+ * CognationWellAuth.lock() and site sign-out clear both.
  *
  * The chart behind the lock is still a local demo EHR. Not HIPAA.
  * PHI must not leave the browser.
@@ -19,12 +28,43 @@
 (function () {
   "use strict";
 
-  var AUTH_KEY = "cognation.well.auth.v1";
+  var AUTH_KEYS = {
+    patient: "cognation.well.auth.patient.v1",
+    provider: "cognation.well.auth.provider.v1",
+  };
+  var LEGACY_AUTH_KEY = "cognation.well.auth.v1";
   var TTL_MS = 4 * 60 * 60 * 1000;
 
-  var pendingOtp = null;
-  var pendingUser = null;
-  var pendingChallenge = null;
+  var COPY = {
+    patient: {
+      eyebrow: "Your appointments",
+      title: "Patient sign-in",
+      desc: "Your own doctor appointments. This opens the Patient portal only. Work hours on the Provider side stay locked until you sign in there. Separate from WAYMAKERS site sign-in.",
+      unlock: "Unlock Patient",
+      lock: "Lock Patient",
+      chip: "Patient session",
+      lockedMsg: "Patient locked. Sign in again for your own doctor appointments. Work hours are unchanged.",
+    },
+    provider: {
+      eyebrow: "Work hours",
+      title: "Provider sign-in",
+      desc: "Work hours for the staff schedule. This opens the Provider portal only. Your own doctor appointments stay locked until you sign in on the Patient side. Separate from WAYMAKERS site sign-in.",
+      unlock: "Unlock Provider",
+      lock: "Lock Provider",
+      chip: "Provider session",
+      lockedMsg: "Provider locked. Sign in again for work hours. Your own doctor appointments are unchanged.",
+    },
+  };
+
+  var pending = {
+    patient: emptyPending(),
+    provider: emptyPending(),
+  };
+  var renderedSide = null;
+
+  function emptyPending() {
+    return { user: null, challenge: null, otp: null };
+  }
 
   function $(sel, root) {
     return (root || document).querySelector(sel);
@@ -42,14 +82,39 @@
     return String(base).replace(/\/$/, "") + "/well-auth";
   }
 
-  function readSession() {
+  function normalizeSide(raw) {
+    return raw === "provider" ? "provider" : raw === "patient" ? "patient" : "";
+  }
+
+  function currentSide(root) {
+    var side = root && root.getAttribute ? root.getAttribute("data-well-side") : "";
+    return side === "provider" ? "provider" : "patient";
+  }
+
+  function storageKey(side) {
+    return AUTH_KEYS[side] || "";
+  }
+
+  function purgeLegacy() {
     try {
-      var raw = sessionStorage.getItem(AUTH_KEY);
+      sessionStorage.removeItem(LEGACY_AUTH_KEY);
+    } catch (e) {}
+  }
+
+  function readSession(side) {
+    side = normalizeSide(side);
+    var key = storageKey(side);
+    if (!key) return null;
+    try {
+      var raw = sessionStorage.getItem(key);
       if (!raw) return null;
       var data = JSON.parse(raw);
-      if (!data || !data.ok || !data.at) return null;
+      if (!data || !data.ok || !data.at || data.side !== side) {
+        sessionStorage.removeItem(key);
+        return null;
+      }
       if (TTL_MS && Date.now() - data.at > TTL_MS) {
-        sessionStorage.removeItem(AUTH_KEY);
+        sessionStorage.removeItem(key);
         return null;
       }
       return data;
@@ -58,15 +123,22 @@
     }
   }
 
-  function writeSession(data) {
+  function writeSession(side, data) {
+    side = normalizeSide(side);
+    var key = storageKey(side);
+    if (!key) return;
     try {
-      if (!data) sessionStorage.removeItem(AUTH_KEY);
-      else sessionStorage.setItem(AUTH_KEY, JSON.stringify(data));
+      if (!data) sessionStorage.removeItem(key);
+      else sessionStorage.setItem(key, JSON.stringify(data));
     } catch (e) {}
   }
 
-  function isAuthenticated() {
-    return !!readSession();
+  function isAuthenticated(side) {
+    if (!normalizeSide(side)) {
+      var root = $("[data-well-app]");
+      side = currentSide(root);
+    }
+    return !!readSession(side);
   }
 
   function setStatus(root, which, message, isError) {
@@ -74,7 +146,7 @@
     if (!el) return;
     el.hidden = !message;
     el.textContent = message || "";
-    el.classList.toggle("is-error", !!isError);
+    if (el.classList && el.classList.toggle) el.classList.toggle("is-error", !!isError);
   }
 
   function setBusy(root, on) {
@@ -83,10 +155,48 @@
     });
   }
 
+  function paintCopy(root, side) {
+    var copy = COPY[side] || COPY.patient;
+    var eyebrow = $("[data-well-auth-eyebrow]", root);
+    var title = $("#well-auth-title", root);
+    var desc = $("#well-auth-desc", root);
+    var chip = $("[data-well-session-label]", root);
+    var lockBtn = $("[data-well-lock-btn]", root);
+    if (eyebrow) eyebrow.textContent = copy.eyebrow;
+    if (title) title.textContent = copy.title;
+    if (desc) desc.textContent = copy.desc;
+    if (chip) chip.textContent = copy.chip;
+    if (lockBtn) lockBtn.textContent = copy.lock;
+    $all("[data-well-auth-unlock]", root).forEach(function (btn) {
+      btn.textContent = copy.unlock;
+    });
+    $all("[data-well-auth-side]", root).forEach(function (btn) {
+      var on = btn.getAttribute("data-well-auth-side") === side;
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      if (btn.classList && btn.classList.toggle) btn.classList.toggle("is-selected", on);
+    });
+    root.setAttribute("data-well-patient-auth", isAuthenticated("patient") ? "unlocked" : "locked");
+    root.setAttribute("data-well-provider-auth", isAuthenticated("provider") ? "unlocked" : "locked");
+  }
+
+  function revealSideToggle(root) {
+    var sideToggle = $("[data-well-side-toggle]", root);
+    if (!sideToggle) return;
+    sideToggle.hidden = false;
+    sideToggle.setAttribute("aria-hidden", "false");
+    $all("button", sideToggle).forEach(function (btn) {
+      btn.disabled = false;
+      if (btn.getAttribute("aria-selected") === "true") btn.tabIndex = 0;
+    });
+  }
+
   function setStep(root, step) {
+    var side = currentSide(root);
+    var slot = pending[side] || emptyPending();
     root.setAttribute("data-well-auth-step", String(step));
     $all("[data-well-auth-step-indicator]", root).forEach(function (el) {
       var n = el.getAttribute("data-well-auth-step-indicator");
+      if (!el.classList || !el.classList.toggle) return;
       el.classList.toggle("is-active", n === String(step));
       el.classList.toggle("is-done", Number(n) < step);
     });
@@ -95,120 +205,115 @@
     if (cred) cred.hidden = step !== 1;
     if (otp) otp.hidden = step !== 2;
     if (step !== 2) {
-      pendingOtp = null;
-      pendingChallenge = null;
       var display = $("[data-well-auth-code-display]", root);
       if (display) display.textContent = "————";
       var otpInput = $("#well-auth-otp", root);
       if (otpInput) otpInput.value = "";
       setStatus(root, "otp", "");
+    } else {
+      var codeEl = $("[data-well-auth-code-display]", root);
+      if (codeEl) codeEl.textContent = slot.otp || "————";
+      setStatus(root, "credentials", "");
+      window.setTimeout(function () {
+        var o = $("#well-auth-otp", root);
+        if (o && o.focus) o.focus();
+      }, 30);
     }
     if (step === 1) {
       window.setTimeout(function () {
         var u = $("#well-auth-username", root);
-        if (u) u.focus();
-      }, 30);
-    } else if (step === 2) {
-      var codeEl = $("[data-well-auth-code-display]", root);
-      if (codeEl) codeEl.textContent = pendingOtp || "————";
-      setStatus(root, "credentials", "");
-      window.setTimeout(function () {
-        var o = $("#well-auth-otp", root);
-        if (o) o.focus();
+        if (u && u.focus) u.focus();
       }, 30);
     }
   }
 
-  function setLockedUi(root, locked) {
-    root.classList.toggle("is-locked", locked);
-    root.setAttribute("data-well-auth-state", locked ? "locked" : "unlocked");
-
+  function showUnlocked(root) {
+    var side = currentSide(root);
+    if (root.classList && root.classList.toggle) root.classList.toggle("is-locked", false);
+    root.setAttribute("data-well-auth-state", "unlocked");
+    paintCopy(root, side);
     var lock = $("[data-well-auth-lock]", root);
-    var secured = $("[data-well-secured]", root);
-    var sessionBar = $("[data-well-session-bar]", root);
-    var sideToggle = $("[data-well-side-toggle]", root);
-
     if (lock) {
-      lock.hidden = !locked;
-      lock.setAttribute("aria-hidden", locked ? "false" : "true");
+      lock.hidden = true;
+      lock.setAttribute("aria-hidden", "true");
     }
-
+    var secured = $("[data-well-secured]", root);
     if (secured) {
-      if (locked) {
-        secured.setAttribute("aria-hidden", "true");
-        secured.setAttribute("inert", "");
-        secured.hidden = false;
-      } else {
-        secured.removeAttribute("aria-hidden");
-        secured.removeAttribute("inert");
-      }
+      secured.removeAttribute("aria-hidden");
+      secured.removeAttribute("inert");
     }
-
-    $all("[data-well-patient-root], [data-well-provider-root]", root).forEach(function (el) {
-      if (locked) {
-        el.setAttribute("aria-hidden", "true");
-        el.setAttribute("inert", "");
-      } else {
-        el.removeAttribute("aria-hidden");
-        el.removeAttribute("inert");
-      }
-    });
-
-    if (sessionBar) sessionBar.hidden = locked;
-    if (sideToggle) {
-      sideToggle.hidden = locked;
-      sideToggle.setAttribute("aria-hidden", locked ? "true" : "false");
-      $all("button", sideToggle).forEach(function (btn) {
-        btn.disabled = locked;
-        if (locked) {
-          btn.tabIndex = -1;
-        } else {
-          btn.tabIndex = btn.getAttribute("aria-selected") === "true" ? 0 : -1;
-        }
-      });
-    }
-
-    if (locked) {
-      var pass = $("#well-auth-password", root);
-      if (pass) pass.value = "";
-      setStep(root, 1);
-    }
+    var sessionBar = $("[data-well-session-bar]", root);
+    if (sessionBar) sessionBar.hidden = false;
+    revealSideToggle(root);
   }
 
-  function unlock(root, username) {
-    pendingOtp = null;
-    pendingUser = null;
-    pendingChallenge = null;
-    writeSession({
+  function showLocked(root) {
+    var side = currentSide(root);
+    if (root.classList && root.classList.toggle) root.classList.toggle("is-locked", true);
+    root.setAttribute("data-well-auth-state", "locked");
+    paintCopy(root, side);
+    var lock = $("[data-well-auth-lock]", root);
+    if (lock) {
+      lock.hidden = false;
+      lock.setAttribute("aria-hidden", "false");
+    }
+    var secured = $("[data-well-secured]", root);
+    if (secured) {
+      secured.setAttribute("aria-hidden", "true");
+      secured.setAttribute("inert", "");
+    }
+    var sessionBar = $("[data-well-session-bar]", root);
+    if (sessionBar) sessionBar.hidden = true;
+    revealSideToggle(root);
+    var slot = pending[side];
+    setStep(root, slot && slot.challenge ? 2 : 1);
+  }
+
+  function clearPending(side) {
+    if (!pending[side]) return;
+    pending[side] = emptyPending();
+  }
+
+  function unlock(root, username, side) {
+    side = normalizeSide(side) || currentSide(root);
+    clearPending(side);
+    purgeLegacy();
+    writeSession(side, {
       ok: true,
       user: username,
+      side: side,
       at: Date.now(),
       factor: "password+otp",
-      note: "sessionStorage · password+otp via /api/well-auth · expires on tab close · soft TTL 4h",
+      note: "sessionStorage · this side only · password+otp via /api/well-auth · tab close ends it · soft TTL 4h",
     });
-    setLockedUi(root, false);
+    if (currentSide(root) === side) showUnlocked(root);
+    else paintCopy(root, currentSide(root));
     document.dispatchEvent(
-      new CustomEvent("cognation:well-auth", { detail: { unlocked: true, user: username } })
+      new CustomEvent("cognation:well-auth", {
+        detail: { unlocked: true, user: username, side: side },
+      })
     );
   }
 
-  function lock(root, opts) {
+  function lockSides(root, sides, opts) {
     opts = opts || {};
-    writeSession(null);
-    pendingOtp = null;
-    pendingUser = null;
-    pendingChallenge = null;
-    if (!root) {
-      $all("[data-well-app]").forEach(function (r) {
-        setLockedUi(r, true);
-        setStatus(r, "credentials", opts.message || "", !!opts.isError);
-      });
-    } else {
-      setLockedUi(root, true);
-      setStatus(root, "credentials", opts.message || "", !!opts.isError);
-    }
+    sides.forEach(function (side) {
+      clearPending(side);
+      writeSession(side, null);
+    });
+    purgeLegacy();
+    var apply = function (r) {
+      if (!r) return;
+      if (isAuthenticated(currentSide(r))) showUnlocked(r);
+      else showLocked(r);
+      if (opts.message) setStatus(r, "credentials", opts.message, !!opts.isError);
+    };
+    if (root) apply(root);
+    else $all("[data-well-app]").forEach(apply);
     document.dispatchEvent(
-      new CustomEvent("cognation:well-auth", { detail: { unlocked: false } })
+      new CustomEvent("cognation:well-auth", {
+        detail: { unlocked: false, sides: sides.slice() },
+      })
     );
   }
 
@@ -241,21 +346,47 @@
     });
   }
 
+  function syncSide(root, opts) {
+    opts = opts || {};
+    var side = currentSide(root);
+    var changed = renderedSide !== side;
+    renderedSide = side;
+    if (changed && opts.clearPassword !== false) {
+      var pass = $("#well-auth-password", root);
+      if (pass) pass.value = "";
+      setStatus(root, "credentials", "");
+      setStatus(root, "otp", "");
+    }
+    if (isAuthenticated(side)) showUnlocked(root);
+    else showLocked(root);
+  }
+
   function ensureGate(root) {
     root = root || $("[data-well-app]");
     if (!root) return isAuthenticated();
-    if (isAuthenticated()) {
-      setLockedUi(root, false);
-      return true;
-    }
-    setLockedUi(root, true);
-    return false;
+    syncSide(root, { clearPassword: false });
+    return isAuthenticated(currentSide(root));
   }
 
   function onWellPanelShown() {
     $all("[data-well-app]").forEach(function (root) {
       ensureGate(root);
     });
+  }
+
+  function chooseSide(root, side) {
+    side = normalizeSide(side);
+    if (!side) return;
+    if (currentSide(root) === side) {
+      syncSide(root);
+      return;
+    }
+    if (window.CognationWellApplySide) {
+      window.CognationWellApplySide(side);
+      return;
+    }
+    root.setAttribute("data-well-side", side);
+    syncSide(root);
   }
 
   function wireRoot(root) {
@@ -267,9 +398,16 @@
     var backBtn = $("[data-well-auth-back]", root);
     var lockBtn = $("[data-well-lock-btn]", root);
 
+    $all("[data-well-auth-side]", root).forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        chooseSide(root, btn.getAttribute("data-well-auth-side"));
+      });
+    });
+
     if (credForm) {
       credForm.addEventListener("submit", function (e) {
         e.preventDefault();
+        var side = currentSide(root);
         var user = normalizeUser(($("#well-auth-username", root) || {}).value);
         var pass = String(($("#well-auth-password", root) || {}).value || "");
         if (!user || !pass) {
@@ -277,25 +415,33 @@
           return;
         }
         setBusy(root, true);
-        setStatus(root, "credentials", "Checking WELL sign-in…", false);
-        postAuth({ step: "credentials", username: user, password: pass })
+        setStatus(root, "credentials", "Checking " + side + " sign-in…", false);
+        postAuth({ step: "credentials", side: side, username: user, password: pass })
           .then(function (data) {
-            if (!data.ok || !data.challenge) {
-              setStatus(
-                root,
-                "credentials",
-                data.error || "WELL sign-in could not be completed.",
-                true
-              );
+            if (!data.ok || !data.challenge || (data.side && data.side !== side)) {
+              if (currentSide(root) === side) {
+                setStatus(
+                  root,
+                  "credentials",
+                  (data.side && data.side !== side
+                    ? "That sign-in is for the other WELL portal."
+                    : data.error) || "WELL sign-in could not be completed.",
+                  true
+                );
+              }
               return;
             }
-            pendingUser = data.user || user;
-            pendingChallenge = data.challenge;
-            pendingOtp = /^\d{6}$/.test(String(data.code || "")) ? String(data.code) : null;
+            pending[side] = {
+              user: data.user || user,
+              challenge: data.challenge,
+              otp: /^\d{6}$/.test(String(data.code || "")) ? String(data.code) : null,
+            };
+            if (currentSide(root) !== side) return;
             setStatus(root, "credentials", "");
             setStep(root, 2);
           })
           .catch(function () {
+            if (currentSide(root) !== side) return;
             setStatus(
               root,
               "credentials",
@@ -312,9 +458,12 @@
     if (otpForm) {
       otpForm.addEventListener("submit", function (e) {
         e.preventDefault();
+        var side = currentSide(root);
+        var slot = pending[side] || emptyPending();
         var input = $("#well-auth-otp", root);
         var code = String((input && input.value) || "").replace(/\s+/g, "");
-        if (!pendingChallenge || !pendingUser) {
+        if (!slot.challenge || !slot.user) {
+          clearPending(side);
           setStep(root, 1);
           setStatus(root, "credentials", "Enter your WELL password again.", true);
           return;
@@ -327,13 +476,24 @@
         setStatus(root, "otp", "Checking verification code…", false);
         postAuth({
           step: "otp",
-          username: pendingUser,
+          side: side,
+          username: slot.user,
           code: code,
-          challenge: pendingChallenge,
+          challenge: slot.challenge,
         })
           .then(function (data) {
+            if (data.side && data.side !== side) {
+              if (currentSide(root) === side) {
+                clearPending(side);
+                setStep(root, 1);
+                setStatus(root, "credentials", "That verification code is for the other WELL portal.", true);
+              }
+              return;
+            }
             if (!data.ok) {
+              if (currentSide(root) !== side) return;
               if (data.restart) {
+                clearPending(side);
                 setStep(root, 1);
                 setStatus(root, "credentials", data.error || "Enter your WELL password again.", true);
                 return;
@@ -341,10 +501,11 @@
               setStatus(root, "otp", data.error || "Wrong verification code.", true);
               return;
             }
-            unlock(root, data.user || pendingUser || "well");
-            setStatus(root, "otp", "");
+            unlock(root, data.user || slot.user || side, side);
+            if (currentSide(root) === side) setStatus(root, "otp", "");
           })
           .catch(function () {
+            if (currentSide(root) !== side) return;
             setStatus(
               root,
               "otp",
@@ -360,6 +521,7 @@
 
     if (backBtn) {
       backBtn.addEventListener("click", function () {
+        clearPending(currentSide(root));
         setStep(root, 1);
         setStatus(root, "credentials", "");
       });
@@ -367,9 +529,10 @@
 
     if (lockBtn) {
       lockBtn.addEventListener("click", function () {
-        lock(root, {
-          message: "WELL locked. Sign in again with your WELL username, password, and verification code.",
-        });
+        var side = currentSide(root);
+        var pass = $("#well-auth-password", root);
+        if (pass) pass.value = "";
+        lockSides(root, [side], { message: COPY[side].lockedMsg });
       });
     }
 
@@ -379,31 +542,72 @@
         otpInput.value = otpInput.value.replace(/\D/g, "").slice(0, 6);
       });
     }
+
+    document.addEventListener("cognation:well-side", function (ev) {
+      var next = ev && ev.detail && ev.detail.side;
+      if (next && root.getAttribute("data-well-side") !== next && !window.CognationWellApplySide) {
+        root.setAttribute("data-well-side", next);
+      }
+      syncSide(root);
+    });
+
+    if (window.MutationObserver) {
+      var observer = new MutationObserver(function () {
+        syncSide(root);
+      });
+      observer.observe(root, { attributes: true, attributeFilter: ["data-well-side"] });
+    }
   }
 
   function boot() {
+    purgeLegacy();
     $all("[data-well-app]").forEach(function (root) {
       wireRoot(root);
       ensureGate(root);
     });
 
     document.addEventListener("cognation:session-ended", function () {
-      lock(null);
+      $all("[data-well-app]").forEach(function (root) {
+        var pass = $("#well-auth-password", root);
+        if (pass) pass.value = "";
+      });
+      lockSides(null, ["patient", "provider"], {
+        message: "WELL locked. Sign in again on each portal you need.",
+      });
     });
   }
 
   window.CognationWellAuth = {
-    AUTH_KEY: AUTH_KEY,
+    AUTH_KEY: LEGACY_AUTH_KEY,
+    LEGACY_AUTH_KEY: LEGACY_AUTH_KEY,
+    AUTH_KEYS: AUTH_KEYS,
     isAuthenticated: isAuthenticated,
     ensureGate: ensureGate,
+    lockSide: function (side) {
+      var normalized = normalizeSide(side);
+      if (!normalized) return false;
+      var root = $("[data-well-app]");
+      lockSides(root, [normalized], {
+        message: root && currentSide(root) === normalized ? COPY[normalized].lockedMsg : "",
+      });
+      return true;
+    },
     lock: function () {
-      lock(null);
+      lockSides(null, ["patient", "provider"], {
+        message: "WELL locked. Sign in again on each portal you need.",
+      });
     },
     unlockSession: function () {
       return false;
     },
     onWellPanelShown: onWellPanelShown,
-    getSession: readSession,
+    getSession: function (side) {
+      if (!normalizeSide(side)) {
+        var root = $("[data-well-app]");
+        side = currentSide(root);
+      }
+      return readSession(side);
+    },
   };
 
   if (document.readyState === "loading") {

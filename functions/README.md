@@ -2,15 +2,23 @@
 
 ## `POST /api/well-auth`
 
-Second lock for the WELL chart. Separate from WAYMAKERS site sign-in. Patient and Provider both stay behind it.
+Separate second locks for the WELL Patient and Provider portals. Separate from WAYMAKERS site sign-in. A Patient unlock does not open Provider, and the reverse.
 
 | Variable | Purpose |
 | --- | --- |
-| `WELL_AUTH_USERS` | Comma-separated WELL usernames |
-| `WELL_AUTH_PASSWORD` | WELL password. Checked on the server. Never commit it. |
-| `WELL_AUTH_SECRET` | Optional HMAC key for the one-time code. Defaults to the password. |
+| `WELL_AUTH_PATIENT_USERS` | Comma-separated Patient usernames |
+| `WELL_AUTH_PATIENT_PASSWORD` | Patient password. Checked on the server. Never commit it. |
+| `WELL_AUTH_PROVIDER_USERS` | Comma-separated Provider usernames |
+| `WELL_AUTH_PROVIDER_PASSWORD` | Provider password. Checked on the server. Never commit it. |
+| `WELL_AUTH_SECRET` | Optional shared HMAC key for challenge tickets. |
 
-`step: "credentials"` checks the username and password. On success the response includes a 6-digit code created for that attempt and a signed challenge (about 5 minutes). `step: "otp"` checks the code against that challenge. Without the env vars the function returns 503 and the chart stays locked.
+The same username may appear on both lists with different passwords. `side` or `role` (`patient` or `provider`) is required on `step: "credentials"` and `step: "otp"`. The challenge ticket is signed for that side and rejected if it is presented to the other side.
+
+Legacy `WELL_AUTH_USERS` / `WELL_AUTH_PASSWORD` are not read. A host with only those variables returns 503 “WELL sign-in is not configured for this side,” so the old shared password cannot open either portal. Migrate by setting the four side-specific variables (and `WELL_AUTH_SECRET` if you want a stable HMAC key).
+
+If `WELL_AUTH_SECRET` is unset, the HMAC fallback is `well-auth-v2`, a newline, the Patient password, a newline, and the Provider password. The legacy shared password is not part of that fallback. Rotating a side password changes the fallback key and invalidates outstanding tickets for both sides. Set `WELL_AUTH_SECRET` when tickets should survive a password change.
+
+`step: "credentials"` checks the username and password for the given side. On success the response includes a 6-digit code created for that attempt and a signed, side-bound challenge (about 5 minutes). `step: "otp"` checks the code against that challenge and the same side. A side with missing users or password returns 503 and that portal stays locked.
 
 Logic checks: `node functions/api/well-auth.test.mjs`.
 

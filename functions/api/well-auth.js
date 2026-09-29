@@ -1,22 +1,38 @@
 /**
  * POST /api/well-auth
  *
- * Second lock for WELL, separate from WAYMAKERS site sign-in.
- * Patient and Provider both stay behind this lock; it is not two passwords.
+ * Separate second locks for the WELL Patient and Provider portals.
+ * Unlocking one side does not open the other. Same username may appear
+ * on both allowlists with different passwords.
  *
  * Env (Cloudflare Pages → Settings → Environment variables). Never commit these:
- *   WELL_AUTH_USERS     comma-separated WELL usernames (example: well-alexa,alexa)
- *   WELL_AUTH_PASSWORD  WELL password checked on the server
- *   WELL_AUTH_SECRET    optional HMAC key for the one-time code; defaults to the password
+ *   WELL_AUTH_PATIENT_USERS      comma-separated Patient usernames
+ *   WELL_AUTH_PATIENT_PASSWORD   Patient password checked on the server
+ *   WELL_AUTH_PROVIDER_USERS     comma-separated Provider usernames
+ *   WELL_AUTH_PROVIDER_PASSWORD  Provider password checked on the server
+ *   WELL_AUTH_SECRET             optional shared HMAC key for challenge tickets
  *
- * Step "credentials": username + password. On success the response includes a
- * one-time 6-digit code and a signed challenge. The code is created per attempt.
- * It is not a fixed value in the repository.
- * Step "otp": username + code + challenge. On success the browser may open the chart.
+ * Legacy WELL_AUTH_USERS / WELL_AUTH_PASSWORD are not read. A host that still
+ * has only those variables fails closed: "WELL sign-in is not configured for
+ * this side." The old shared password cannot open either portal.
+ *
+ * WELL_AUTH_SECRET signs challenge tickets for both sides. If it is unset, the
+ * documented fallback key is:
+ *   well-auth-v2\n + WELL_AUTH_PATIENT_PASSWORD + \n + WELL_AUTH_PROVIDER_PASSWORD
+ * The legacy shared password is not part of that fallback. Tickets embed the
+ * side, so a Patient ticket cannot be replayed against Provider (or the reverse)
+ * even when both sides share one HMAC key.
+ *
+ * Body.side or body.role is required on credentials and otp: "patient" | "provider".
+ * Step "credentials": username + password for that side. Success returns a
+ * one-time 6-digit code and a side-bound challenge. The code is created per
+ * attempt. It is not a fixed value in the repository.
+ * Step "otp": username + code + challenge for the same side.
  */
 
 var OTP_TTL_MS = 5 * 60 * 1000;
 var MAX_BODY = 4096;
+var SIDES = { patient: true, provider: true };
 
 function noStoreHeaders() {
   return {
@@ -38,8 +54,36 @@ function normalizeUser(raw) {
   return u;
 }
 
-function allowedUsers(env) {
-  return String((env && env.WELL_AUTH_USERS) || "")
+function normalizeSide(raw) {
+  var s = String(raw || "").trim().toLowerCase();
+  return SIDES[s] ? s : "";
+}
+
+function readSide(body) {
+  var hasSide = body.side != null && String(body.side).trim() !== "";
+  var hasRole = body.role != null && String(body.role).trim() !== "";
+  var side = hasSide ? normalizeSide(body.side) : "";
+  var role = hasRole ? normalizeSide(body.role) : "";
+  if (hasSide && !side) return "";
+  if (hasRole && !role) return "";
+  if (side && role && side !== role) return "";
+  return side || role;
+}
+
+function sidePassword(env, side) {
+  if (side === "patient") return String((env && env.WELL_AUTH_PATIENT_PASSWORD) || "");
+  if (side === "provider") return String((env && env.WELL_AUTH_PROVIDER_PASSWORD) || "");
+  return "";
+}
+
+function sideUsersRaw(env, side) {
+  if (side === "patient") return String((env && env.WELL_AUTH_PATIENT_USERS) || "");
+  if (side === "provider") return String((env && env.WELL_AUTH_PROVIDER_USERS) || "");
+  return "";
+}
+
+function allowedUsers(env, side) {
+  return sideUsersRaw(env, side)
     .split(",")
     .map(function (part) {
       return normalizeUser(part);
@@ -48,14 +92,19 @@ function allowedUsers(env) {
     .slice(0, 32);
 }
 
-function configured(env) {
-  return allowedUsers(env).length > 0 && String((env && env.WELL_AUTH_PASSWORD) || "").length > 0;
+function configured(env, side) {
+  return !!SIDES[side] && allowedUsers(env, side).length > 0 && sidePassword(env, side).length > 0;
 }
 
 function authSecret(env) {
   var secret = String((env && env.WELL_AUTH_SECRET) || "");
   if (secret) return secret;
-  return String((env && env.WELL_AUTH_PASSWORD) || "");
+  return (
+    "well-auth-v2\n" +
+    sidePassword(env, "patient") +
+    "\n" +
+    sidePassword(env, "provider")
+  );
 }
 
 function bytesToB64Url(bytes) {
@@ -109,8 +158,8 @@ function randomCode() {
   return String(100000 + (buf[0] % 900000));
 }
 
-async function issueChallenge(env, username, code, exp) {
-  var payload = JSON.stringify({ u: username, c: code, exp: exp });
+async function issueChallenge(env, username, code, exp, side) {
+  var payload = JSON.stringify({ u: username, c: code, exp: exp, s: side });
   var sig = await hmac(authSecret(env), payload);
   var body = bytesToB64Url(new TextEncoder().encode(payload));
   return body + "." + bytesToB64Url(sig);
@@ -131,7 +180,13 @@ async function readChallenge(env, challenge) {
   if (!timingSafeEqual(provided, expected)) return null;
   try {
     var data = JSON.parse(payload);
-    if (!data || typeof data.u !== "string" || typeof data.c !== "string" || typeof data.exp !== "number") {
+    if (
+      !data ||
+      typeof data.u !== "string" ||
+      typeof data.c !== "string" ||
+      typeof data.exp !== "number" ||
+      !SIDES[data.s]
+    ) {
       return null;
     }
     return data;
@@ -140,27 +195,41 @@ async function readChallenge(env, challenge) {
   }
 }
 
+function notConfigured(side) {
+  return json(503, {
+    ok: false,
+    side: side,
+    error: "WELL sign-in is not configured for this side.",
+  });
+}
+
+function chooseSide() {
+  return json(400, {
+    ok: false,
+    error: "Choose Patient or Provider before signing in.",
+  });
+}
+
 async function handleCredentials(env, body, now) {
-  if (!configured(env)) {
-    return json(503, {
-      ok: false,
-      error: "WELL sign-in is not configured on this host.",
-    });
-  }
+  var side = readSide(body);
+  if (!side) return chooseSide();
+  if (!configured(env, side)) return notConfigured(side);
   var user = normalizeUser(body.username);
   var password = String(body.password == null ? "" : body.password);
-  var users = allowedUsers(env);
+  var users = allowedUsers(env, side);
   var userOk = users.indexOf(user) !== -1;
-  var passOk = password.length > 0 && password.length <= 256 && (await sameSecret(password, env.WELL_AUTH_PASSWORD));
+  var expected = sidePassword(env, side);
+  var passOk = password.length > 0 && password.length <= 256 && (await sameSecret(password, expected));
   if (!userOk || !passOk) {
-    return json(401, { ok: false, error: "Wrong WELL username or password." });
+    return json(401, { ok: false, side: side, error: "Wrong WELL username or password." });
   }
   var code = randomCode();
   var exp = now() + OTP_TTL_MS;
-  var challenge = await issueChallenge(env, user, code, exp);
+  var challenge = await issueChallenge(env, user, code, exp, side);
   return json(200, {
     ok: true,
     step: "otp",
+    side: side,
     user: user,
     code: code,
     challenge: challenge,
@@ -169,26 +238,32 @@ async function handleCredentials(env, body, now) {
 }
 
 async function handleOtp(env, body, now) {
-  if (!configured(env)) {
-    return json(503, {
-      ok: false,
-      error: "WELL sign-in is not configured on this host.",
-    });
-  }
+  var side = readSide(body);
+  if (!side) return chooseSide();
+  if (!configured(env, side)) return notConfigured(side);
   var user = normalizeUser(body.username);
   var code = String(body.code == null ? "" : body.code).replace(/\s+/g, "");
   var ticket = await readChallenge(env, body.challenge);
   if (!ticket || ticket.exp <= now() || ticket.u !== user) {
     return json(401, {
       ok: false,
+      side: side,
       restart: true,
       error: "Verification expired. Enter your WELL password again.",
     });
   }
-  if (!/^\d{6}$/.test(code) || !(await sameSecret(code, ticket.c))) {
-    return json(401, { ok: false, error: "Wrong verification code." });
+  if (ticket.s !== side) {
+    return json(401, {
+      ok: false,
+      side: side,
+      restart: true,
+      error: "That verification code is for the other WELL portal. Sign in on this side.",
+    });
   }
-  return json(200, { ok: true, user: user });
+  if (!/^\d{6}$/.test(code) || !(await sameSecret(code, ticket.c))) {
+    return json(401, { ok: false, side: side, error: "Wrong verification code." });
+  }
+  return json(200, { ok: true, side: side, user: user });
 }
 
 export async function handleWellAuth(request, env, opts) {
