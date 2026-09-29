@@ -11679,12 +11679,6 @@ body:has(.waymakers-masthead) .site-header {
   transition: background 280ms ease;
 }
 
-.login-gate-brand--splash .wm-north-star {
-  /* Login brain height is 25rem × 8.1/16 ≈ 12.7rem. */
-  width: min(100%, 12.4rem);
-  margin-top: 0.2rem;
-}
-
 .wm-north-star-img {
   position: relative;
   z-index: 1;
@@ -11795,13 +11789,6 @@ body:has(.waymakers-masthead) .site-header {
       drop-shadow(0 0 8px rgba(186, 204, 220, 0.42));
   }
 }
-
-@media (max-width: 720px) {
-  .login-gate-brand--splash .wm-north-star {
-    width: min(100%, 9.6rem);
-  }
-}
-
 
 /* ===== PAGES → JOBS link ===== */
 .pages-jobs-link {
