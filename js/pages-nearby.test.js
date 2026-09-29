@@ -13,6 +13,7 @@ var listings = globalThis.CognationPagesDemo;
 
 var LOOP = { lat: 41.8781, lng: -87.6298 };
 var NYC = { lat: 40.7128, lng: -74.006 };
+var OKC = { lat: 35.4676, lng: -97.5164 };
 var clark = listings.filter(function (item) {
   return item.name === "Clark Street Café";
 })[0];
@@ -28,6 +29,9 @@ assert.ok(inChicago.length >= 20, "chicago device sees nearby storefronts");
 
 var inNyc = near.withinRadius(listings, NYC.lat, NYC.lng);
 assert.strictEqual(inNyc.length, 0, "no chicago businesses for a new york device");
+
+var inOkc = near.withinRadius(listings, OKC.lat, OKC.lng);
+assert.strictEqual(inOkc.length, 0, "no chicago businesses for a 405 oklahoma device");
 
 assert.strictEqual(near.withinRadius(listings, NaN, LOOP.lng).length, 0);
 assert.strictEqual(near.withinRadius(listings, null, null).length, 0);
