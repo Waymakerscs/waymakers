@@ -3457,6 +3457,55 @@ body.login-gate-open .app-topbar {
   font-weight: 700;
 }
 
+.pages-distance {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pages-location {
+  margin: 0.75rem 0 0.35rem;
+  padding: 0.7rem 0.75rem;
+  border: 2px solid var(--pages-ink);
+  background: rgba(255, 254, 245, 0.85);
+}
+
+.pages-location-message {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--pages-ink);
+}
+
+.pages-location-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.55rem;
+  min-height: 1.85rem;
+  padding: 0.22rem 0.65rem;
+  font-family: "Times New Roman", Times, Georgia, serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 2px solid var(--pages-ink);
+  border-radius: 0;
+  cursor: pointer;
+  line-height: 1.2;
+  background: var(--pages-ink);
+  color: var(--pages-paper);
+}
+
+.pages-location-retry:hover,
+.pages-location-retry:focus-visible {
+  background: #fffef5;
+  color: var(--pages-ink);
+  outline: 2px solid var(--pages-ink);
+  outline-offset: 2px;
+}
+
 .pages-neighborhood {
   color: var(--pages-ink-soft);
   font-weight: 600;
@@ -12096,13 +12145,22 @@ textarea::placeholder {
 .jobs-apply-btn,
 .jobs-apply-btn--external,
 .pages-jobs-link,
+.pages-location-retry,
 .btn-primary {
   color: #f4f7fb !important;
 }
 
+.pages-location-retry {
+  background: #0a0a0c !important;
+  border-color: #0a0a0c !important;
+}
+
 .pages-jobs-link:hover,
-.pages-jobs-link:focus-visible {
+.pages-jobs-link:focus-visible,
+.pages-location-retry:hover,
+.pages-location-retry:focus-visible {
   color: #0a0a0c !important;
+  background: #fffef5 !important;
 }
 
 /* Keep silvery holo wordmark treatment (black glyphs + white glow) */

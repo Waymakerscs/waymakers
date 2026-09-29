@@ -85,6 +85,48 @@
     { name: "Wicker Park Wellness MD", category: "Doctor", blurb: "Walk-in clinic for colds and physicals.", phone: "(773) 555-0140", neighborhood: "Wicker Park", address: "1608 N Milwaukee Ave, Chicago, IL 60622" },
   ];
 
+  /**
+   * Approximate coordinates for storefront listings so distance uses the
+   * device position. Listings without a public street have no point and
+   * are not treated as "nearby" anywhere. This is not a viewer fallback.
+   */
+  var LISTING_LATLNG = {
+    "Ashland Avenue Barber Co.": [41.9205, -87.6684],
+    "Belmont Pet Emporium": [41.9416, -87.6512],
+    "Bridgeport Bloom Florist": [41.8384, -87.6478],
+    "Bronzeville Family Dentistry": [41.8096, -87.6142],
+    "Clark Street Café": [41.9804, -87.6685],
+    "Hyde Park Family Medicine — Dr. Maya Chen": [41.7996, -87.5886],
+    "Hyde Park Pediatric Care": [41.7953, -87.5889],
+    "Irving Park Auto Works": [41.9536, -87.7268],
+    "Kedzie Kids Daycare": [41.9274, -87.7068],
+    "Lakeview Legal Group": [41.9382, -87.6639],
+    "Milwaukee Ave Grill": [41.9094, -87.6765],
+    "Northside Nail & Paw Groomer": [41.9632, -87.6794],
+    "Oak Street Orthodontics": [41.9008, -87.6264],
+    "Pilsen Pasta House": [41.8572, -87.6662],
+    "Queen of Sheba Café": [41.9655, -87.6576],
+    "Roscoe Village Veterinary Grooming": [41.9432, -87.6824],
+    "Taylor Street Barber Shop": [41.8694, -87.6572],
+    "Violet & Vine Florist": [41.8843, -87.6518],
+    "Western Avenue Auto Clinic": [41.969, -87.6888],
+    "Albany Park Family Law": [41.9686, -87.7102],
+    "Cicero Court Café": [41.799, -87.7436],
+    "Dunning Daycare Nest": [41.9534, -87.7892],
+    "Foster Pet Supply": [41.9568, -87.6854],
+    "Heartland Internal Medicine": [41.8939, -87.6204],
+    "Old Town Italian Kitchen": [41.9106, -87.6344],
+    "Portage Park Barbers": [41.9548, -87.7476],
+    "Wicker Park Wellness MD": [41.9108, -87.6776],
+  };
+
+  DEMO_LISTINGS.forEach(function (item) {
+    var pair = LISTING_LATLNG[item.name];
+    if (!pair) return;
+    item.lat = pair[0];
+    item.lng = pair[1];
+  });
+
   var LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
   /**
@@ -225,10 +267,22 @@
     return null;
   }
 
-  function listingDirectionsHref(item) {
+  function listingDirectionsHref(item, userAgent) {
     var api = directionsApi();
     if (!api || typeof api.directionsHrefForListing !== "function") return "";
-    return api.directionsHrefForListing(item);
+    var ua = userAgent;
+    if (ua == null && typeof navigator !== "undefined") ua = navigator.userAgent;
+    return api.directionsHrefForListing(item, ua);
+  }
+
+  function nearbyApi() {
+    if (typeof window !== "undefined" && window.WaymakersPagesNearby) {
+      return window.WaymakersPagesNearby;
+    }
+    if (typeof globalThis !== "undefined" && globalThis.WaymakersPagesNearby) {
+      return globalThis.WaymakersPagesNearby;
+    }
+    return null;
   }
 
   function appendListingActions(li, item) {
@@ -247,7 +301,7 @@
       directions.setAttribute("data-pages-directions", "");
       directions.setAttribute(
         "aria-label",
-        "Directions to " + (item.name || "this business") + " in Apple Maps"
+        "Turn-by-turn directions to " + (item.name || "this business")
       );
       actions.appendChild(directions);
     }
@@ -325,6 +379,15 @@
         var addressHtml = addressText
           ? '<span class="pages-address">' + escapeHtml(addressText) + "</span>"
           : "";
+        var distanceHtml = "";
+        if (typeof item.distanceMiles === "number" && isFinite(item.distanceMiles)) {
+          var milesLabel =
+            item.distanceMiles < 10
+              ? item.distanceMiles.toFixed(1)
+              : String(Math.round(item.distanceMiles));
+          distanceHtml =
+            '<span class="pages-distance">' + escapeHtml(milesLabel) + " mi</span>";
+        }
         li.innerHTML =
           '<div class="pages-listing-row">' +
           '<span class="pages-chip">' +
@@ -344,6 +407,7 @@
           escapeHtml(item.phone) +
           "</a>" +
           addressHtml +
+          distanceHtml +
           '<span class="pages-neighborhood">' +
           escapeHtml(item.neighborhood) +
           "</span>" +
@@ -367,26 +431,117 @@
 
     if (!search || !category || !results || !empty) return;
 
+    var locationBox = root.querySelector("[data-pages-location]");
+    var locationMessage = root.querySelector("[data-pages-location-message]");
+    var locationRetry = root.querySelector("[data-pages-location-retry]");
+    var userLocation = null;
+    var searchEmptyText = empty.textContent;
+
     buildCategoryOptions(category);
     if (az) buildAzBar(az, {});
+
+    function showLocation(view) {
+      if (locationMessage) locationMessage.textContent = view.message || "";
+      if (locationBox) locationBox.hidden = !view.message;
+      if (locationRetry) locationRetry.hidden = !view.showRetry;
+    }
 
     function refresh() {
       var cat = category.value;
       var q = search.value;
-      fetchPagesListings(cat, q).then(function (listings) {
+      var api = nearbyApi();
+      fetchPagesListings(cat, "").then(function (listings) {
+        var view = api
+          ? api.nearbyResult(listings, userLocation)
+          : {
+              listings: [],
+              located: false,
+              showRetry: true,
+              message:
+                "Location is unavailable. Turn on location services for this browser and try again. Waymakers will not show a default city.",
+            };
+        showLocation(view);
+        if (!view.located) {
+          results.innerHTML = "";
+          results.hidden = true;
+          empty.hidden = true;
+          if (countEl) countEl.textContent = "";
+          if (az) buildAzBar(az, {});
+          return;
+        }
+        var shown = filterDemoListings(cat, q).filter(function (item) {
+          return view.listings.some(function (nearItem) {
+            return nearItem.name === item.name;
+          });
+        }).map(function (item) {
+          var nearItem = view.listings.filter(function (candidate) {
+            return candidate.name === item.name;
+          })[0];
+          var copy = {};
+          Object.keys(item).forEach(function (key) {
+            copy[key] = item[key];
+          });
+          if (nearItem) copy.distanceMiles = nearItem.distanceMiles;
+          return copy;
+        });
+        shown.sort(function (a, b) {
+          return a.distanceMiles - b.distanceMiles;
+        });
         if (countEl) {
           countEl.textContent =
-            listings.length === 1
-              ? "1 listing"
-              : listings.length + " listings";
+            shown.length === 1 ? "1 listing" : shown.length + " listings";
         }
-        renderListings(results, empty, listings);
+        if (!shown.length) {
+          results.innerHTML = "";
+          results.hidden = true;
+          if (view.listings.length) {
+            empty.hidden = false;
+            empty.textContent = searchEmptyText;
+          } else {
+            empty.hidden = true;
+          }
+          if (az) buildAzBar(az, {});
+          return;
+        }
+        empty.textContent = searchEmptyText;
+        renderListings(results, empty, shown);
       });
+    }
+
+    function askLocation() {
+      userLocation = null;
+      refresh();
+      var geo = typeof navigator !== "undefined" ? navigator.geolocation : null;
+      if (!geo || typeof geo.getCurrentPosition !== "function") {
+        userLocation = { ok: false, reason: "unavailable" };
+        refresh();
+        return;
+      }
+      geo.getCurrentPosition(
+        function (pos) {
+          var coords = pos && pos.coords;
+          if (!coords || !isFinite(coords.latitude) || !isFinite(coords.longitude)) {
+            userLocation = { ok: false, reason: "unavailable" };
+          } else {
+            userLocation = { ok: true, lat: coords.latitude, lng: coords.longitude };
+          }
+          refresh();
+        },
+        function (err) {
+          var reason = "unavailable";
+          if (err && err.code === 1) reason = "denied";
+          else if (err && err.code === 3) reason = "timeout";
+          userLocation = { ok: false, reason: reason };
+          refresh();
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
+      );
     }
 
     search.addEventListener("input", refresh);
     category.addEventListener("change", refresh);
-    refresh();
+    if (locationRetry) locationRetry.addEventListener("click", askLocation);
+    askLocation();
   }
 
   function boot() {

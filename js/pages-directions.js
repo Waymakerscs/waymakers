@@ -1,9 +1,14 @@
 /**
- * Apple Maps directions for PAGES listings.
+ * Turn-by-turn directions for PAGES listings.
  *
- * Uses an https://maps.apple.com query URL (daddr). On iPhone and iPad that
- * opens the Maps app. On desktop it opens Apple Maps in the browser.
- * The maps:// scheme is not used — it is a dead link off Apple devices.
+ * iPhone / iPad and desktop: Apple Maps driving directions
+ *   https://maps.apple.com/?daddr=...&dirflg=d
+ *   (current location → destination). Not a place pin (`q`, `address`, `/place`).
+ * Android: Google Maps turn-by-turn
+ *   https://www.google.com/maps/dir/?api=1&destination=...&travelmode=driving&dir_action=navigate
+ *   Not a search pin (`/maps/search` or `query=`).
+ * The maps:// and google.navigation: schemes are not used — they are dead links
+ * off their own platforms. https links still open the native app on iOS and Android.
  */
 (function (root) {
   "use strict";
@@ -38,7 +43,7 @@
   }
 
   /**
-   * A usable listing address can be dropped into Apple Maps as a destination.
+   * A usable listing address is a street destination for turn-by-turn navigation.
    * Neighborhood labels, city/zip only, and placeholders are not destinations.
    */
   function isUsableAddress(value) {
@@ -48,20 +53,53 @@
     return /\b\d{1,6}\s+[A-Za-z0-9]/.test(s);
   }
 
+  function userAgentString(userAgent) {
+    if (userAgent != null) return String(userAgent);
+    if (typeof navigator !== "undefined" && navigator.userAgent) return navigator.userAgent;
+    return "";
+  }
+
+  function prefersGoogleMaps(userAgent) {
+    return /Android/i.test(userAgentString(userAgent));
+  }
+
+  /** Apple Maps driving directions from the user's current location. Not a pin. */
+  function appleTurnByTurnUrl(address) {
+    return "https://maps.apple.com/?daddr=" + encodeURIComponent(address) + "&dirflg=d";
+  }
+
+  /** Google Maps turn-by-turn navigation. Not a search/place pin. */
+  function googleTurnByTurnUrl(address) {
+    return (
+      "https://www.google.com/maps/dir/?api=1&destination=" +
+      encodeURIComponent(address) +
+      "&travelmode=driving&dir_action=navigate"
+    );
+  }
+
+  function navigationUrl(address, userAgent) {
+    var s = collapse(address);
+    if (!isUsableAddress(s)) return "";
+    if (prefersGoogleMaps(userAgent)) return googleTurnByTurnUrl(s);
+    return appleTurnByTurnUrl(s);
+  }
+
   function appleMapsDirectionsUrl(address) {
     var s = collapse(address);
     if (!isUsableAddress(s)) return "";
-    return "https://maps.apple.com/?daddr=" + encodeURIComponent(s);
+    return appleTurnByTurnUrl(s);
   }
 
-  function directionsHrefForListing(item) {
+  function directionsHrefForListing(item, userAgent) {
     if (!item) return "";
-    return appleMapsDirectionsUrl(item.address);
+    return navigationUrl(item.address, userAgent);
   }
 
   root.WaymakersPagesDirections = {
     isUsableAddress: isUsableAddress,
+    prefersGoogleMaps: prefersGoogleMaps,
     appleMapsDirectionsUrl: appleMapsDirectionsUrl,
+    navigationUrl: navigationUrl,
     directionsHrefForListing: directionsHrefForListing,
   };
 })(typeof window !== "undefined" ? window : globalThis);
