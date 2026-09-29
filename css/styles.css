@@ -12165,6 +12165,133 @@ body:has(.waymakers-masthead) .site-header {
   color: #0d4a38;
 }
 
+/* CAREER — credentials & documents (browser-local) */
+.jobs-credentials {
+  margin: 0 0 1.1rem;
+  padding: 0.85rem 0.95rem;
+  border: 1px solid rgba(30, 50, 80, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+}
+.jobs-credentials-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.jobs-credentials-demo {
+  margin: 0.45rem 0 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(160, 90, 20, 0.45);
+  background: rgba(255, 244, 230, 0.9);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.jobs-credentials-alert {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(120, 40, 40, 0.45);
+  background: rgba(255, 236, 236, 0.95);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.jobs-credentials-alert[hidden] { display: none; }
+.jobs-credentials-list {
+  display: grid;
+  gap: 0.65rem;
+}
+.jobs-credentials-slot {
+  margin: 0;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid rgba(30, 50, 80, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+.jobs-credentials-label {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+.jobs-credentials-hint,
+.jobs-credentials-empty,
+.jobs-credentials-meta,
+.jobs-credentials-slot-note,
+.jobs-credentials-status {
+  margin: 0.28rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.jobs-credentials-filename {
+  margin: 0.45rem 0 0;
+  font-size: 0.88rem;
+  font-weight: 750;
+  word-break: break-word;
+}
+.jobs-credentials-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  align-items: center;
+}
+.jobs-credentials-file,
+.jobs-credentials-btn {
+  position: relative;
+  display: inline-block;
+  margin: 0;
+  padding: 0.32rem 0.7rem;
+  border-radius: 8px;
+  border-style: solid;
+  border-width: 1px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.jobs-credentials-file {
+  overflow: hidden;
+}
+.jobs-credentials-file input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
+}
+.jobs-credentials-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.jobs-credentials-file:focus-within,
+.jobs-credentials-btn:focus-visible {
+  outline: 2px solid rgba(40, 70, 110, 0.9);
+  outline-offset: 2px;
+}
+.jobs-credentials-preview {
+  display: block;
+  margin-top: 0.5rem;
+  max-width: 100%;
+  max-height: 140px;
+  width: auto;
+  border-radius: 6px;
+  border: 1px solid rgba(30, 50, 80, 0.2);
+  object-fit: contain;
+  background: #fff;
+}
+.jobs-credentials-slot-note:empty,
+.jobs-credentials-status:empty { display: none; }
+.jobs-credentials-slot-note.is-error { font-weight: 750; }
+@media (min-width: 800px) {
+  .jobs-credentials-list { grid-template-columns: 1fr 1fr; }
+}
+
 /* WELL — doctor notes + messaging */
 .well-jobs-link {
   display: inline-block;
@@ -12489,6 +12616,8 @@ textarea::placeholder {
 .pages-chip,
 .pages-az button,
 .jobs-clear,
+.jobs-credentials-file,
+.jobs-credentials-btn,
 .jobs-chip,
 .btn:not(.btn-primary):not(.login-submit-btn):not(.jobs-apply-btn),
 .app-logout-btn,
