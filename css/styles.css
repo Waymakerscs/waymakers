@@ -3452,6 +3452,60 @@ body.login-gate-open .app-topbar {
   outline: none;
 }
 
+.pages-address {
+  color: var(--pages-ink);
+  font-weight: 700;
+}
+
+.pages-distance {
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pages-location {
+  margin: 0.75rem 0 0.35rem;
+  padding: 0.7rem 0.75rem;
+  border: 2px solid var(--pages-ink);
+  background: rgba(255, 254, 245, 0.85);
+}
+
+.pages-location-message {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--pages-ink);
+}
+
+.pages-location-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.55rem;
+  min-height: 1.85rem;
+  padding: 0.22rem 0.65rem;
+  font-family: "Times New Roman", Times, Georgia, serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border: 2px solid var(--pages-ink);
+  border-radius: 0;
+  cursor: pointer;
+  line-height: 1.2;
+  background: var(--pages-ink);
+  color: var(--pages-paper);
+}
+
+.pages-location-retry:hover,
+.pages-location-retry:focus-visible {
+  background: #fffef5;
+  color: var(--pages-ink);
+  outline: 2px solid var(--pages-ink);
+  outline-offset: 2px;
+}
+
 .pages-neighborhood {
   color: var(--pages-ink-soft);
   font-weight: 600;
@@ -3475,7 +3529,8 @@ body.login-gate-open .app-topbar {
 }
 
 .pages-tower-link,
-.pages-call-btn {
+.pages-call-btn,
+.pages-directions-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3493,13 +3548,16 @@ body.login-gate-open .app-topbar {
   line-height: 1.2;
 }
 
-.pages-tower-link {
+.pages-tower-link,
+.pages-directions-link {
   background: transparent;
   color: var(--pages-ink);
 }
 
 .pages-tower-link:hover,
-.pages-tower-link:focus-visible {
+.pages-tower-link:focus-visible,
+.pages-directions-link:hover,
+.pages-directions-link:focus-visible {
   background: var(--pages-ink);
   color: var(--pages-paper);
   outline: none;
@@ -11489,6 +11547,17 @@ body:has(.waymakers-masthead) .site-header {
   outline: 2px solid var(--pages-ink);
   outline-offset: 2px;
 }
+.pages-directions-link {
+  background: transparent;
+  color: #0a0a0c;
+}
+.pages-directions-link:hover,
+.pages-directions-link:focus-visible {
+  background: #0a0a0c;
+  color: #f4f7fb;
+  outline: 2px solid #0a0a0c;
+  outline-offset: 2px;
+}
 .pages-listing--has-jobs .pages-chip {
   box-shadow: inset 0 0 0 1px rgba(244, 228, 166, 0.35);
 }
@@ -12081,13 +12150,22 @@ textarea::placeholder {
 .jobs-apply-btn,
 .jobs-apply-btn--external,
 .pages-jobs-link,
+.pages-location-retry,
 .btn-primary {
   color: #f4f7fb !important;
 }
 
+.pages-location-retry {
+  background: #0a0a0c !important;
+  border-color: #0a0a0c !important;
+}
+
 .pages-jobs-link:hover,
-.pages-jobs-link:focus-visible {
+.pages-jobs-link:focus-visible,
+.pages-location-retry:hover,
+.pages-location-retry:focus-visible {
   color: #0a0a0c !important;
+  background: #fffef5 !important;
 }
 
 /* Keep silvery holo wordmark treatment (black glyphs + white glow) */
