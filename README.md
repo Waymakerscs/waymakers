@@ -11,7 +11,7 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
 - Header masthead: **WAYMAKERS** wordmark (glowing black on silvery holo) + tagline “A wellness concierge”
 - Signup / sign-in (WAYMAKERS Supabase)
 - Tabs: **WELL · PAGES · HOME · CAREER** (roles stay distinct)
-  - **WELL** — company/provider UI (EHR demo chart, roster, doctor→patient messages, audit-only doctor notes, Apple Health consent + export upload)
+  - **WELL** — Patient chart (PHI stays in this browser) and Provider visit chart (SOAP only). Patient and Provider sign-ins are separate. The patient releases the same chart to the next doctor.
   - **PAGES** — local directory of what’s available (`pages.js`)
   - **HOME** — empty placeholder (content TBD)
   - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); openings keyed by `companyId`, plus Indeed / LinkedIn by location
@@ -78,6 +78,17 @@ LinkedIn Jobs API is **partner-gated**. Indeed’s Publisher / Job Search API ne
 
 4. Redeploy Pages so `functions/` ships with the site (see Deploy below). Details: `functions/README.md`.
 
+## WELL · Chart flow (v1)
+
+Local demo EHR. Not HIPAA. PHI stays in this browser.
+
+| Store | Who writes | What |
+| --- | --- | --- |
+| `cognation.well.portal.v1` | Patient | Chart PHI (vitals, meds, allergies, and the rest) plus release shares |
+| `cognation.well.soap.v1` | Provider | SOAP notes only (S/O/A/P), tied to a visit |
+
+The provider opens a patient from the clinic visit, not from a separate chart. They can read that patient’s chart after the patient has released it, and they can save SOAP for the visit. A provider save that includes BP, meds, or other PHI fields is rejected and is not written into the SOAP store. Releasing the chart to the next doctor adds a share. The next doctor reads the same vitals and meds. The chart is not cleared.
+
 ## WELL · Apple Health (v1)
 
 Patient portal tab **Apple Health**:
@@ -97,7 +108,7 @@ Patient and Provider both get a clinic calendar that behaves like a Microsoft Te
 - Toggle which employees are visible (Dr. Maya Chen, Dr. James Okonkwo, nurses, front desk). Disconnect hides the overlays and keeps those picks for the next connect.
 - **First available** suggests the next open 30-minute visits from weekday clinic hours (9:00–12:00 and 1:00–4:30), existing WELL appointments, and — once connected — that doctor's mock calendar plus the demo patient's own Outlook holds.
 - One-tap **Book** writes the visit into `cognation.well.portal.v1` (same portal store as the chart). It shows under Upcoming on the patient side and on the provider clinic schedule.
-- **Everyone’s calendar is private.** Shared overlays are Busy / Free only. A person sees full detail on their own events (the patient’s visits and Outlook, or the signed-in provider’s own mailbox). Other patients’ names and reasons, and other employees’ short names, subjects, notes, and attendees, are not on the overlay. Opaque pills say Busy (or Unavailable on a held slot) with a hatch — not a staff short name. First-available uses the same free/busy gate. Clinic workflow names stay in a separate list labeled **Clinic schedule · provider only**. Demo only — not HIPAA-certified — and the overlay is masked that way (`presentForRole`).
+- **Everyone’s calendar is private.** Shared overlays are Busy / Free only. A person sees full detail on their own events (the patient’s visits and Outlook, or the signed-in provider’s own mailbox). Other patients’ names and reasons, and other employees’ short names, subjects, notes, and attendees, are not on the overlay. Opaque pills say Busy (or Unavailable on a held slot) with a hatch — not a staff short name. First-available uses the same free/busy gate. Clinic workflow names stay in a separate list labeled **Clinic schedule · open a visit**. The open chart is that visit’s patient. Demo only — not HIPAA-certified — and the overlay is masked that way (`presentForRole`).
 
 Adapter: `js/well-calendar-connect.js` (`WellCalendarConnect.useAdapter` is the seam for a future Graph `calendarView`). Logic checks: `node js/well-calendar-connect.test.js`.
 
