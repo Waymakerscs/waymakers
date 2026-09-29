@@ -12288,3 +12288,22 @@ textarea::placeholder {
     linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12) 42%, rgba(180, 195, 215, 0.28)) !important;
   background-color: rgba(236, 242, 248, 0.72) !important;
 }
+
+/* DESK v1 — blank white empty page beside WELL. No copy, cards, or widgets. */
+#panel-desk.desk-blank {
+  min-height: 70vh;
+  margin: 0;
+  padding: 0;
+  border: 0 !important;
+  background: #fff !important;
+  background-color: #fff !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.tabs.tabs--chrome .tab-panels:has(#panel-desk:not([hidden])) {
+  background: #fff !important;
+  background-color: #fff !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}

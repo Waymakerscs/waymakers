@@ -10,8 +10,9 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
 
 - Header masthead: **WAYMAKERS** wordmark (glowing black on silvery holo) + tagline “A wellness concierge”
 - Signup / sign-in (WAYMAKERS Supabase)
-- Tabs: **WELL · PAGES · HOME · CAREER** (roles stay distinct)
+- Tabs: **WELL · DESK · PAGES · HOME · CAREER** (roles stay distinct)
   - **WELL** — company/provider UI (EHR demo chart, roster, doctor→patient messages, audit-only doctor notes, Apple Health consent + export upload)
+  - **DESK** — Waymakers-only blank white empty page beside WELL (v1; no copy, cards, or widgets)
   - **PAGES** — local directory of what’s available (`pages.js`). Listings appear only after the browser shares a location, and only within 25 miles of that point. Denied or unavailable location asks you to enable it and does not substitute Chicago or any other city. **Directions** is turn-by-turn: Apple Maps `?daddr=&dirflg=d` on iPhone, iPad, and desktop; Google Maps `dir_action=navigate` on Android. No usable street address means no Directions control.
   - **HOME** — empty placeholder (content TBD)
   - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); Waymakers openings keyed by `companyId`, plus remote-only Indeed and LinkedIn
