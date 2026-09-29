@@ -12251,16 +12251,19 @@ body:has(.waymakers-masthead) .site-header {
   line-height: 1.3;
   cursor: pointer;
 }
+.jobs-credentials-file {
+  overflow: hidden;
+}
 .jobs-credentials-file input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
+  opacity: 0;
+  cursor: pointer;
+  font-size: 0;
 }
 .jobs-credentials-btn:disabled {
   opacity: 0.55;
