@@ -11644,7 +11644,7 @@ body:has(.waymakers-masthead) .site-header {
 }
 
 /* Holographic north star — three soft four-point silver glints under WAYMAKERS.
-   Idle is a calm halo and a slow sheen. Hover brightens that shimmer only.
+   Idle sheen is static and dim. Hover or focus on the wordmark lifts it.
    No compass rays, no yellow. prefers-reduced-motion freezes the sheen. */
 .wm-wordmark {
   position: relative;
@@ -11709,7 +11709,7 @@ body:has(.waymakers-masthead) .site-header {
   inset: 0;
   z-index: 2;
   pointer-events: none;
-  opacity: 0.42;
+  opacity: 0.32;
   background: linear-gradient(
     112deg,
     transparent 38%,
@@ -11720,7 +11720,7 @@ body:has(.waymakers-masthead) .site-header {
     transparent 68%
   );
   background-size: 240% 100%;
-  background-position: 100% 0;
+  background-position: 46% 0;
   mix-blend-mode: soft-light;
   -webkit-mask-image: url("../assets/wm-north-star.svg");
   mask-image: url("../assets/wm-north-star.svg");
@@ -11730,7 +11730,7 @@ body:has(.waymakers-masthead) .site-header {
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
-  animation: wm-star-sheen 16s ease-in-out infinite alternate;
+  animation: none;
 }
 
 .wm-wordmark:hover .wm-north-star::before,
@@ -11755,7 +11755,7 @@ body:has(.waymakers-masthead) .site-header {
 .wm-wordmark:hover .wm-north-star-sheen,
 .wm-wordmark:focus-visible .wm-north-star-sheen {
   opacity: 0.72;
-  animation-duration: 9s;
+  animation: wm-star-sheen 9s ease-in-out infinite alternate;
 }
 
 @keyframes wm-star-sheen {
@@ -11780,7 +11780,7 @@ body:has(.waymakers-masthead) .site-header {
   .wm-wordmark:hover .wm-north-star-sheen,
   .wm-wordmark:focus-visible .wm-north-star-sheen {
     animation: none;
-    opacity: 0.36;
+    opacity: 0.32;
     background-position: 46% 0;
   }
 
