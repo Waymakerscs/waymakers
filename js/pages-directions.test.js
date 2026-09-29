@@ -1,5 +1,7 @@
 /**
- * Node tests for PAGES → Apple Maps directions.
+ * Node tests for PAGES turn-by-turn directions.
+ * iOS and desktop: Apple Maps daddr + dirflg=d (not a pin).
+ * Android: Google Maps dir_action=navigate (not a search pin).
  * Run: node js/pages-directions.test.js
  */
 "use strict";
@@ -19,8 +21,14 @@ var IPHONE =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 var IPAD =
   "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+var CRIOS =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.6099.119 Mobile/15E148 Safari/604.1";
+var IPAD_DESKTOP_MODE =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15";
 var ANDROID =
   "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+var ANDROID_TABLET =
+  "Mozilla/5.0 (Linux; Android 13; SM-X200) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 var DESKTOP =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
@@ -52,11 +60,23 @@ assert.strictEqual(
   "https://maps.apple.com/?daddr=" + encodeURIComponent(clark) + "&dirflg=d"
 );
 assertAppleNavigation(clarkUrl, "clark");
+assert.strictEqual(dir.mapsPlatform(IPHONE), "ios");
+assert.strictEqual(dir.mapsPlatform(IPAD), "ios");
+assert.strictEqual(dir.mapsPlatform(CRIOS), "ios");
+assert.strictEqual(dir.mapsPlatform(ANDROID), "android");
+assert.strictEqual(dir.mapsPlatform(ANDROID_TABLET), "android");
+assert.strictEqual(dir.mapsPlatform(DESKTOP), "desktop");
+assert.strictEqual(dir.mapsPlatform(IPAD_DESKTOP_MODE), "desktop");
 assertAppleNavigation(dir.navigationUrl(clark, IPHONE), "iphone");
 assertAppleNavigation(dir.navigationUrl(clark, IPAD), "ipad");
+assertAppleNavigation(dir.navigationUrl(clark, CRIOS), "crios");
 assertAppleNavigation(dir.navigationUrl(clark, DESKTOP), "desktop");
+assertAppleNavigation(dir.navigationUrl(clark, IPAD_DESKTOP_MODE), "ipad desktop mode");
 assertAppleNavigation(dir.navigationUrl(clark), "default desktop");
 assertGoogleNavigation(dir.navigationUrl(clark, ANDROID), "android");
+assertGoogleNavigation(dir.navigationUrl(clark, ANDROID_TABLET), "android tablet");
+assert.ok(dir.navigationUrl(clark, IPHONE).indexOf("google.com") === -1);
+assert.ok(dir.navigationUrl(clark, ANDROID).indexOf("maps.apple.com") === -1);
 assert.strictEqual(dir.prefersGoogleMaps(ANDROID), true);
 assert.strictEqual(dir.prefersGoogleMaps(IPHONE), false);
 assert.strictEqual(dir.prefersGoogleMaps(DESKTOP), false);
@@ -91,6 +111,9 @@ assert.ok(dir.navigationUrl("123 Main St & Oak, Chicago", ANDROID).indexOf("&dir
 ].forEach(function (bad) {
   assert.strictEqual(dir.isUsableAddress(bad), false, "unusable: " + bad);
   assert.strictEqual(dir.appleMapsDirectionsUrl(bad), "", "no href: " + bad);
+  assert.strictEqual(dir.navigationUrl(bad, IPHONE), "", "ios hidden: " + bad);
+  assert.strictEqual(dir.navigationUrl(bad, ANDROID), "", "android hidden: " + bad);
+  assert.strictEqual(dir.navigationUrl(bad, DESKTOP), "", "desktop hidden: " + bad);
 });
 
 assert.strictEqual(dir.isUsableAddress("9 Oak Street"), true);

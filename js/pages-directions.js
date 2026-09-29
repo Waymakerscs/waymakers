@@ -59,8 +59,21 @@
     return "";
   }
 
+  /**
+   * ios → Apple Maps driving directions.
+   * android → Google Maps turn-by-turn.
+   * desktop (and iPadOS reporting as Macintosh) → Apple Maps web directions,
+   * which still opens a driving route rather than a place pin.
+   */
+  function mapsPlatform(userAgent) {
+    var ua = userAgentString(userAgent);
+    if (/Android/i.test(ua)) return "android";
+    if (/iPhone|iPad|iPod/i.test(ua)) return "ios";
+    return "desktop";
+  }
+
   function prefersGoogleMaps(userAgent) {
-    return /Android/i.test(userAgentString(userAgent));
+    return mapsPlatform(userAgent) === "android";
   }
 
   /** Apple Maps driving directions from the user's current location. Not a pin. */
@@ -80,7 +93,7 @@
   function navigationUrl(address, userAgent) {
     var s = collapse(address);
     if (!isUsableAddress(s)) return "";
-    if (prefersGoogleMaps(userAgent)) return googleTurnByTurnUrl(s);
+    if (mapsPlatform(userAgent) === "android") return googleTurnByTurnUrl(s);
     return appleTurnByTurnUrl(s);
   }
 
@@ -97,6 +110,7 @@
 
   root.WaymakersPagesDirections = {
     isUsableAddress: isUsableAddress,
+    mapsPlatform: mapsPlatform,
     prefersGoogleMaps: prefersGoogleMaps,
     appleMapsDirectionsUrl: appleMapsDirectionsUrl,
     navigationUrl: navigationUrl,
