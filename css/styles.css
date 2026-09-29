@@ -11643,9 +11643,9 @@ body:has(.waymakers-masthead) .site-header {
   #main .tabs-section { margin-top: -0.2rem; }
 }
 
-/* Holographic north star — quiet faceted gem under the WAYMAKERS wordmark.
+/* Holographic north star — soft four-point silver glints under WAYMAKERS.
    Idle is a calm halo and a slow sheen. Hover brightens that shimmer only.
-   No compass rays. prefers-reduced-motion freezes the sheen. */
+   No compass rays, no yellow. prefers-reduced-motion freezes the sheen. */
 .wm-wordmark {
   position: relative;
 }
@@ -11714,11 +11714,11 @@ body:has(.waymakers-masthead) .site-header {
   background: linear-gradient(
     112deg,
     transparent 38%,
-    rgba(255, 255, 255, 0.18) 44%,
-    rgba(255, 255, 255, 0.82) 50%,
-    rgba(214, 236, 246, 0.42) 54%,
-    rgba(244, 214, 230, 0.22) 58%,
-    transparent 66%
+    rgba(255, 255, 255, 0.2) 44%,
+    rgba(255, 255, 255, 0.88) 50%,
+    rgba(214, 226, 238, 0.4) 55%,
+    rgba(214, 210, 228, 0.18) 60%,
+    transparent 68%
   );
   background-size: 240% 100%;
   background-position: 100% 0;
