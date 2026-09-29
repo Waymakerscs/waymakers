@@ -11451,7 +11451,7 @@ body > * {
   min-height: 0;
   max-width: 1240px;
   margin: 0 auto;
-  padding: clamp(1.75rem, 4vw, 3.25rem) clamp(1rem, 4vw, 3rem) 1.85rem;
+  padding: clamp(1.75rem, 4vw, 3.25rem) clamp(1rem, 4vw, 3rem) 2.35rem;
   justify-items: center;
   align-content: start;
 }
@@ -11525,9 +11525,9 @@ body:has(.waymakers-masthead) .site-header {
 
 @media (max-width: 720px) {
   .waymakers-masthead { min-height: 0; }
-  .waymakers-masthead-inner { padding-top: 1.6rem; padding-bottom: 1.45rem; }
+  .waymakers-masthead-inner { padding-top: 1.6rem; padding-bottom: 1.75rem; }
   .waymakers-masthead-home { font-size: clamp(2.4rem, 14vw, 4.6rem) !important; letter-spacing: -0.09em !important; }
-  .waymakers-masthead .wm-north-star { width: clamp(3.15rem, 18vw, 4.25rem); }
+  .waymakers-masthead .wm-north-star { width: min(13.75rem, 62vw); }
   #main .tabs-section { margin-top: -0.2rem; }
 }
 
@@ -11549,14 +11549,27 @@ body:has(.waymakers-masthead) .site-header {
 .wm-north-star {
   position: relative;
   display: block;
-  width: clamp(3.5rem, 10vw, 6.4rem);
+  /* Cognation brain is ~276px tall (610px × 7.25/16). Match that companion height. */
+  width: min(17.5rem, 36vw);
   aspect-ratio: 1;
-  margin: 0.28rem auto 0;
+  margin: 0.1rem auto 0.2rem;
   isolation: isolate;
 }
 
+.wm-north-star::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 8% 10%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(ellipse, rgba(125, 239, 255, 0.62), rgba(196, 132, 252, 0.32) 46%, transparent 72%);
+  filter: blur(16px);
+}
+
 .login-gate-brand--splash .wm-north-star {
-  width: clamp(2.7rem, 20cqi, 3.85rem);
+  /* Login brain height is 25rem × 8.1/16 ≈ 12.7rem. */
+  width: min(100%, 12.4rem);
   margin-top: 0.2rem;
 }
 
@@ -11567,9 +11580,9 @@ body:has(.waymakers-masthead) .site-header {
   width: 100%;
   height: 100%;
   filter:
-    drop-shadow(0 1px 1.5px rgba(15, 23, 42, 0.38))
-    drop-shadow(0 0 5px rgba(255, 255, 255, 0.85))
-    drop-shadow(0 0 12px rgba(34, 211, 238, 0.32));
+    drop-shadow(0 1px 1px rgba(15, 23, 42, 0.4))
+    drop-shadow(0 0 16px rgba(125, 239, 255, 0.82))
+    drop-shadow(0 0 42px rgba(199, 140, 255, 0.55));
   transition: filter 220ms ease;
 }
 
@@ -11578,10 +11591,10 @@ body:has(.waymakers-masthead) .site-header {
   left: 50%;
   top: 50%;
   z-index: 0;
-  width: 168%;
-  height: 168%;
+  width: 146%;
+  height: 146%;
   transform: translate(-50%, -50%);
-  opacity: 0.2;
+  opacity: 0.42;
   pointer-events: none;
   background: conic-gradient(
     from 0deg,
@@ -11645,14 +11658,19 @@ body:has(.waymakers-masthead) .site-header {
   mask-size: contain;
 }
 
+.wm-wordmark:hover .wm-north-star::before,
+.wm-wordmark:focus-visible .wm-north-star::before {
+  background: radial-gradient(ellipse, rgba(210, 252, 255, 0.85), rgba(216, 160, 255, 0.5) 42%, rgba(251, 191, 36, 0.22) 64%, transparent 78%);
+}
+
 .wm-wordmark:hover .wm-north-star-img,
 .wm-wordmark:focus-visible .wm-north-star-img {
   filter:
-    drop-shadow(0 1px 1.5px rgba(15, 23, 42, 0.45))
-    drop-shadow(0 0 6px rgba(255, 255, 255, 1))
-    drop-shadow(0 0 14px rgba(34, 211, 238, 0.72))
-    drop-shadow(0 0 26px rgba(192, 132, 252, 0.55))
-    drop-shadow(0 0 34px rgba(251, 191, 36, 0.38));
+    drop-shadow(0 1px 1px rgba(15, 23, 42, 0.45))
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 22px rgba(125, 239, 255, 0.95))
+    drop-shadow(0 0 58px rgba(199, 140, 255, 0.78))
+    drop-shadow(0 0 78px rgba(251, 191, 36, 0.4));
 }
 
 .wm-wordmark:hover .wm-north-star-rays,
@@ -11684,6 +11702,11 @@ body:has(.waymakers-masthead) .site-header {
     animation: none;
   }
 
+  .wm-wordmark:hover .wm-north-star::before,
+  .wm-wordmark:focus-visible .wm-north-star::before {
+    background: radial-gradient(ellipse, rgba(125, 239, 255, 0.62), rgba(196, 132, 252, 0.32) 46%, transparent 72%);
+  }
+
   .wm-wordmark:hover .wm-north-star-sheen,
   .wm-wordmark:focus-visible .wm-north-star-sheen {
     animation: none;
@@ -11692,15 +11715,21 @@ body:has(.waymakers-masthead) .site-header {
 
   .wm-wordmark:hover .wm-north-star-rays,
   .wm-wordmark:focus-visible .wm-north-star-rays {
-    opacity: 0.2;
+    opacity: 0.42;
   }
 
   .wm-wordmark:hover .wm-north-star-img,
   .wm-wordmark:focus-visible .wm-north-star-img {
     filter:
-      drop-shadow(0 1px 1.5px rgba(15, 23, 42, 0.38))
-      drop-shadow(0 0 5px rgba(255, 255, 255, 0.85))
-      drop-shadow(0 0 12px rgba(34, 211, 238, 0.32));
+      drop-shadow(0 1px 1px rgba(15, 23, 42, 0.4))
+      drop-shadow(0 0 16px rgba(125, 239, 255, 0.82))
+      drop-shadow(0 0 42px rgba(199, 140, 255, 0.55));
+  }
+}
+
+@media (max-width: 720px) {
+  .login-gate-brand--splash .wm-north-star {
+    width: min(100%, 9.6rem);
   }
 }
 
