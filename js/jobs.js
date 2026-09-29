@@ -620,12 +620,18 @@
       var pluginLive = feeds.some(function (feed) {
         return feed && feed.mode === "plugin";
       });
-      var countLabel =
-        openingCount === 1
-          ? "1 opening"
-          : openingCount + " openings";
-      if (openingCount === 0 && pluginLive) countLabel = "Indeed remote search loaded";
-      if (openingCount === 0 && !pluginLive && !showLocal) {
+      var partnerBlocked = feeds.some(function (feed) {
+        return feed && feed.mode === "partner_blocked";
+      });
+      var notConfigured = feeds.some(function (feed) {
+        return !feed || feed.mode === "not_configured" || feed.mode === "error";
+      });
+      var countLabel = openingCount === 1 ? "1 opening" : openingCount + " openings";
+      if (openingCount === 0 && pluginLive && !partnerBlocked && !notConfigured) {
+        countLabel = "Indeed remote search loaded";
+      } else if (openingCount === 0 && !showLocal && partnerBlocked && !notConfigured) {
+        countLabel = "Remote listings unavailable";
+      } else if (openingCount === 0 && !showLocal && !pluginLive) {
         countLabel = "Remote feeds not configured";
       }
       updateFilterChrome(
