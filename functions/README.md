@@ -16,17 +16,30 @@ Logic checks: `node functions/api/well-auth.test.mjs`.
 
 ## `GET /api/jobs`
 
-Proxy stub for Indeed Publisher / LinkedIn Jobs. Secrets stay in Cloudflare Pages environment variables — never in `js/cognation-config.js`.
+Remote-only Indeed and LinkedIn for CAREER. `source=indeed` or `source=linkedin`. `q` and `location` are optional keywords. Remote is forced; a `remote=0` query does not turn it off. Secrets stay in Cloudflare Pages environment variables — never in `js/cognation-config.js`.
 
 | Variable | Purpose |
 | --- | --- |
-| `INDEED_PUBLISHER_ID` | Indeed Publisher / affiliate id |
-| `INDEED_API_KEY` | Optional secret if Indeed issues one |
-| `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` / `LINKEDIN_ACCESS_TOKEN` | LinkedIn partner Jobs API (partner-gated) |
+| `INDEED_PARTNER_APP_ID` | Indeed Publisher plugin partner app id. **Partner approval required.** |
+| `INDEED_PLACEMENT_ID` | Indeed Publisher plugin placement id. **Partner approval required.** |
+| `LINKEDIN_CLIENT_ID` | LinkedIn app client id. Pair with the secret, or set the token instead. |
+| `LINKEDIN_CLIENT_SECRET` | LinkedIn app secret. Never returned to the browser. |
+| `LINKEDIN_ACCESS_TOKEN` | Optional token in place of client id + secret. |
 
-**Not live.** This Function is deeplink-only: it does not return job listings, even if Pages env vars are present. The response is `mode: "deeplink"` plus a public search URL. The CAREER tab labels those cards “Deeplink only · not live”. Wire official HTTP in `fetchIndeedListings` / `fetchLinkedInListings` before treating this as a listings API.
+`INDEED_PUBLISHER_ID` and `INDEED_API_KEY` are **ignored**. The old Publisher search API is retired and is not called.
 
-Do **not** HTML-scrape job boards as the permanent solution (brittle + ToS risk).
+| Keys | Response |
+| --- | --- |
+| Indeed ids missing or unusable | `200`, `mode: "not_configured"`, `jobs: []` |
+| Both Indeed ids set | `200`, `mode: "plugin"`, official script URL, `data-indeed-search-where=Remote`, `jobs: []` (Indeed renders the results) |
+| LinkedIn keys missing | `200`, `mode: "not_configured"`, `jobs: []` |
+| LinkedIn token, or client id + secret | `200`, `mode: "partner_blocked"`, `jobs: []` |
+
+LinkedIn’s [Job Posting API](https://learn.microsoft.com/en-us/linkedin/talent/job-postings/api/overview) is write-only and not open to new partnerships. This function does not scrape either site and does not call another job board.
+
+Logic checks: `node functions/api/jobs.test.mjs`.
+
+Do **not** HTML-scrape job boards.
 
 Deploy with the site root (functions/ sibling to index.html):
 

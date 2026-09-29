@@ -500,10 +500,10 @@
               <div class="jobs-shell" data-jobs-shell>
                 <header class="jobs-intro">
                   <h3 class="jobs-title">CAREER</h3>
-                  <p class="jobs-dek">Applicant board · local company openings plus Indeed / LinkedIn by location</p>
-                  <p class="jobs-role-note">Companies manage care work in WELL; openings to apply for are listed here.</p>
+                  <p class="jobs-dek">Remote jobs from LinkedIn Jobs and Indeed, plus Waymakers company openings.</p>
+                  <p class="jobs-role-note">Indeed and LinkedIn stay remote-only. They stay empty until Cloudflare Pages has the partner credentials — this board does not invent listings.</p>
                   <p class="jobs-deferral" role="note">
-                    Local demo. Waymakers Apply does not submit applications. Indeed and LinkedIn cards are deeplink only — the jobs API is not a live listings feed.
+                    Waymakers Apply does not submit applications. LinkedIn and Indeed need partner approval before remote listings can load.
                   </p>
                 </header>
 
@@ -511,7 +511,7 @@
                   <label class="jobs-sr-only" for="jobs-company">Filter by company</label>
                   <select id="jobs-company" class="jobs-company" data-jobs-company aria-label="Filter by company"></select>
                   <label class="jobs-sr-only" for="jobs-location">Location</label>
-                  <input type="search" id="jobs-location" class="jobs-location-input" data-jobs-location placeholder="City, region, or zip" autocomplete="address-level2" aria-label="Filter by location (city, region, or zip)" />
+                  <input type="search" id="jobs-location" class="jobs-location-input" data-jobs-location placeholder="City, region, or zip" autocomplete="address-level2" aria-label="City, region, or zip. Filters Waymakers openings. Added as a keyword on Indeed and LinkedIn without turning remote off." />
                   <label class="jobs-sr-only" for="jobs-source">Source</label>
                   <select id="jobs-source" class="jobs-source" data-jobs-source aria-label="Filter by source">
                     <option value="">All sources</option>
@@ -525,12 +525,14 @@
 
                 <p class="jobs-filter-banner" data-jobs-filter-banner hidden></p>
 
+                <div class="jobs-remote" data-jobs-remote aria-label="Remote jobs from Indeed and LinkedIn"></div>
+                <h4 class="jobs-local-heading" data-jobs-local-heading hidden>Waymakers openings</h4>
                 <div class="jobs-book">
                   <div class="jobs-results" data-jobs-results aria-label="Job openings"></div>
                   <p class="jobs-empty" data-jobs-empty hidden>No openings match.</p>
                 </div>
 
-                <p class="jobs-footer-note">Waymakers openings keyed by company id (WELL &amp; PAGES) · Indeed / LinkedIn: deeplink only, jobs API not live</p>
+                <p class="jobs-footer-note">Waymakers openings use company id (WELL &amp; PAGES). Indeed and LinkedIn are remote only and fail closed when they are not configured.</p>
               </div>
             </div>
           </div>

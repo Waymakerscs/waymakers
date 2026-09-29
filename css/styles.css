@@ -11693,6 +11693,58 @@ body:has(.waymakers-masthead) .site-header {
   font-style: italic;
   opacity: 0.75;
 }
+.jobs-remote {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 0.9rem;
+}
+.jobs-remote[hidden] { display: none; }
+.jobs-local-heading {
+  margin: 0.2rem 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.jobs-local-heading[hidden] { display: none; }
+.jobs-source-status {
+  margin: 0;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(30, 50, 80, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+.jobs-source-status--not_configured,
+.jobs-source-status--partner_blocked,
+.jobs-source-status--error {
+  border-color: rgba(160, 90, 20, 0.5);
+  background: rgba(255, 244, 230, 0.92);
+}
+.jobs-source-status__title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+.jobs-source-status__detail,
+.jobs-source-status__keys {
+  margin: 0.4rem 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+.jobs-source-status__keys { font-weight: 750; }
+.jobs-source-status__docs {
+  display: inline-block;
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 750;
+  color: inherit;
+}
+.jobs-indeed-plugin { margin-top: 0.75rem; }
+.jobs-chip--remote {
+  background: rgba(20, 90, 70, 0.12);
+  border-color: rgba(20, 90, 70, 0.4);
+  color: #0d4a38;
+}
 
 /* WELL — doctor notes + messaging */
 .well-jobs-link {
@@ -11950,6 +12002,12 @@ dt, dd, figcaption, time, address, cite, dfn, abbr, q, s, mark,
 .jobs-hint,
 .jobs-footer-note,
 .jobs-filter-banner,
+.jobs-local-heading,
+.jobs-source-status,
+.jobs-source-status__title,
+.jobs-source-status__detail,
+.jobs-source-status__keys,
+.jobs-source-status__docs,
 .well-app,
 .pages-app,
 .jobs-shell,

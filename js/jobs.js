@@ -6,9 +6,8 @@
  * or WaymakersJobs.filterByCompany(id) from Pages “View jobs” links.
  *
  * Sources: waymakers (company demo jobs) | indeed | linkedin.
- * Location filter (city / region / zip) applies to demo jobs and deep-link cards.
- * Without Indeed/LinkedIn API keys, external sources are honest search deep-links
- * (see jobs-adapters.js) — not fake scraped listings.
+ * Indeed and LinkedIn are remote-only and come from /api/jobs.
+ * Missing keys or a partner block show a not-configured status — never invented listings.
  *
  * Not a company workspace (that’s WELL) and not a directory (that’s PAGES).
  */
@@ -248,21 +247,22 @@
         "</span>";
       if (job.external) {
         chips +=
-          '<span class="jobs-chip jobs-chip--external">External</span>' +
-          '<span class="jobs-chip jobs-chip--deferred">Deeplink only · not live</span>';
+          '<span class="jobs-chip jobs-chip--remote">Remote</span>' +
+          '<span class="jobs-chip jobs-chip--external">External</span>';
       } else {
         chips += '<span class="jobs-chip jobs-chip--deferred">Local demo</span>';
       }
 
       var actions;
-      if (job.external && job.url) {
+      var safeUrl = job.external && /^https:\/\//i.test(String(job.url || "")) ? job.url : "";
+      if (safeUrl) {
         actions =
           '<div class="jobs-card-actions">' +
           '<a class="jobs-apply-btn jobs-apply-btn--external" href="' +
-          escapeHtml(job.url) +
-          '" target="_blank" rel="noopener noreferrer">Open ' +
+          escapeHtml(safeUrl) +
+          '" target="_blank" rel="noopener noreferrer">View on ' +
           escapeHtml(sourceLabel(job.source)) +
-          " search (deeplink · not live)</a>" +
+          "</a>" +
           "</div>";
       } else {
         actions =
@@ -362,6 +362,7 @@
       if (companyId) parts.push("company “" + companyName(companyId) + "”");
       if (location) parts.push("near “" + location + "”");
       if (source) parts.push("source " + sourceLabel(source));
+      if (source === "indeed" || source === "linkedin") parts.push("remote jobs only");
       if (parts.length) {
         banner.hidden = false;
         banner.textContent = "Showing openings for " + parts.join(" · ");
@@ -371,9 +372,149 @@
       }
     }
     if (countEl) {
-      var n = typeof count === "number" ? count : 0;
-      countEl.textContent = n === 1 ? "1 opening" : n + " openings";
+      if (typeof count === "string") {
+        countEl.textContent = count;
+      } else {
+        var n = typeof count === "number" ? count : 0;
+        countEl.textContent = n === 1 ? "1 opening" : n + " openings";
+      }
     }
+  }
+
+  function docsLink(url) {
+    if (typeof url !== "string") return null;
+    var ok =
+      url.indexOf("https://docs.indeed.com/") === 0 ||
+      url.indexOf("https://learn.microsoft.com/en-us/linkedin/") === 0;
+    if (!ok) return null;
+    var a = document.createElement("a");
+    a.className = "jobs-source-status__docs";
+    a.href = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = "Official docs";
+    return a;
+  }
+
+  function mountIndeedPlugin(section, plugin) {
+    var A = adapters();
+    var allowed = A && A.INDEED_PLUGIN_SCRIPT;
+    if (!plugin || !allowed || plugin.scriptUrl !== allowed) return;
+    var attrs = plugin.attributes || {};
+    if (attrs["data-indeed-search-where"] !== "Remote") return;
+    var mount = document.createElement("div");
+    mount.className = "jobs-indeed-plugin";
+    Object.keys(attrs).forEach(function (key) {
+      if (key.indexOf("data-indeed-") !== 0) return;
+      mount.setAttribute(key, String(attrs[key]));
+    });
+    section.appendChild(mount);
+    var existing = document.querySelector("script[data-indeed-plugin-script]");
+    if (existing) existing.remove();
+    var script = document.createElement("script");
+    script.src = allowed;
+    script.defer = true;
+    script.crossOrigin = "anonymous";
+    script.setAttribute("data-indeed-plugin-script", "");
+    script.addEventListener("error", function () {
+      var note = document.createElement("p");
+      note.className = "jobs-source-status__detail";
+      note.textContent = "Indeed’s plugin did not load. No listings were added in its place.";
+      section.appendChild(note);
+    });
+    document.head.appendChild(script);
+  }
+
+  function renderFeed(feed) {
+    var source = feed && feed.source ? feed.source : "";
+    var section = document.createElement("section");
+    section.className =
+      "jobs-source-status jobs-source-status--" +
+      String((feed && feed.mode) || "error").replace(/[^a-z_]/g, "");
+    section.setAttribute("data-jobs-remote-source", source);
+    section.setAttribute("role", "status");
+
+    var title = document.createElement("h4");
+    title.className = "jobs-source-status__title";
+    title.textContent = sourceLabel(source) + " · remote";
+    section.appendChild(title);
+
+    var detail = document.createElement("p");
+    detail.className = "jobs-source-status__detail";
+    detail.textContent = (feed && feed.message) || "Not configured.";
+    section.appendChild(detail);
+
+    if (feed && feed.mode === "not_configured" && feed.missing && feed.missing.length) {
+      var keys = document.createElement("p");
+      keys.className = "jobs-source-status__keys";
+      keys.textContent = "Cloudflare Pages env still needed: " + feed.missing.join(", ") + ".";
+      section.appendChild(keys);
+    }
+    if (feed && feed.rejected && feed.rejected.length) {
+      var rejected = document.createElement("p");
+      rejected.className = "jobs-source-status__keys";
+      rejected.textContent = "Set, but not usable (value not shown): " + feed.rejected.join(", ") + ".";
+      section.appendChild(rejected);
+    }
+    var link = docsLink(feed && feed.docs);
+    if (link) section.appendChild(link);
+
+    if (feed && feed.mode === "plugin") mountIndeedPlugin(section, feed.plugin);
+
+    var jobs = feed && Array.isArray(feed.jobs) ? feed.jobs : [];
+    if (feed && feed.mode === "listings" && jobs.length) {
+      var list = document.createElement("ul");
+      list.className = "jobs-list";
+      jobs.forEach(function (job) {
+        var li = document.createElement("li");
+        li.className = "jobs-card jobs-card--external";
+        li.setAttribute("data-job-id", job.id || "");
+        li.setAttribute("data-jobs-source", job.source || source);
+        li.innerHTML =
+          '<div class="jobs-card-row"><strong class="jobs-card-title">' +
+          escapeHtml(job.title) +
+          "</strong>" +
+          '<span class="jobs-chip jobs-chip--remote">Remote</span>' +
+          '<span class="jobs-chip jobs-chip--source">' +
+          escapeHtml(sourceLabel(job.source || source)) +
+          "</span></div>" +
+          '<p class="jobs-card-company">' +
+          escapeHtml(job.companyName || sourceLabel(source)) +
+          "</p>" +
+          (job.blurb ? '<p class="jobs-card-blurb">' + escapeHtml(job.blurb) + "</p>" : "") +
+          '<p class="jobs-card-meta"><span class="jobs-location">' +
+          escapeHtml(job.location || "Remote") +
+          "</span></p>" +
+          '<div class="jobs-card-actions"><a class="jobs-apply-btn jobs-apply-btn--external" href="' +
+          escapeHtml(job.url) +
+          '" target="_blank" rel="noopener noreferrer">View on ' +
+          escapeHtml(sourceLabel(job.source || source)) +
+          "</a></div>";
+        list.appendChild(li);
+      });
+      section.appendChild(list);
+    }
+    return section;
+  }
+
+  function paintRemote(feeds, showRemote) {
+    if (!shellRoot) return;
+    var remoteEl = shellRoot.querySelector("[data-jobs-remote]");
+    if (!remoteEl) return;
+    remoteEl.hidden = !showRemote;
+    remoteEl.replaceChildren();
+    if (!showRemote) return;
+    (feeds || []).forEach(function (feed) {
+      remoteEl.appendChild(renderFeed(feed));
+    });
+  }
+
+  function listingCount(feeds) {
+    var n = 0;
+    (feeds || []).forEach(function (feed) {
+      if (feed && feed.mode === "listings" && Array.isArray(feed.jobs)) n += feed.jobs.length;
+    });
+    return n;
   }
 
   function gatherJobs(companyId, location, source) {
@@ -382,8 +523,11 @@
     var wantIndeed = !src || src === "indeed";
     var wantLi = !src || src === "linkedin";
     var A = adapters();
-    var loc = (location || "").trim() || defaultLocation();
     var companyLabel = companyId ? companyName(companyId) : "";
+    var externalOpts = {
+      location: (location || "").trim(),
+      query: companyLabel,
+    };
 
     var waymakers = wantWm
       ? filterWaymakersJobs(companyId, location).map(function (j) {
@@ -391,29 +535,22 @@
         })
       : [];
 
-    var externalOpts = {
-      location: loc,
-      companyName: companyLabel,
-      query: companyLabel || "healthcare",
-    };
-
     var indeedP = wantIndeed
       ? A && A.searchIndeed
         ? A.searchIndeed(externalOpts)
-        : Promise.resolve([])
-      : Promise.resolve([]);
+        : Promise.resolve(null)
+      : Promise.resolve(null);
     var linkedinP = wantLi
       ? A && A.searchLinkedIn
         ? A.searchLinkedIn(externalOpts)
-        : Promise.resolve([])
-      : Promise.resolve([]);
+        : Promise.resolve(null)
+      : Promise.resolve(null);
 
     return Promise.all([indeedP, linkedinP]).then(function (pair) {
-      var indeed = pair[0] || [];
-      var linkedin = pair[1] || [];
-      /* When a company filter is active, still show external search cards
-         (keyword = company) after Waymakers openings — honest, not fake. */
-      return waymakers.concat(indeed).concat(linkedin);
+      var feeds = [];
+      if (wantIndeed) feeds.push(pair[0]);
+      if (wantLi) feeds.push(pair[1]);
+      return { waymakers: waymakers, feeds: feeds.filter(Boolean) };
     });
   }
 
@@ -432,11 +569,32 @@
       activeFilter,
       activeLocation,
       activeSource,
-      null
+      "Loading…"
     );
 
     var results = shellRoot.querySelector("[data-jobs-results]");
     var empty = shellRoot.querySelector("[data-jobs-empty]");
+    var remoteEl = shellRoot.querySelector("[data-jobs-remote]");
+    var localHeading = shellRoot.querySelector("[data-jobs-local-heading]");
+    if (localHeading) localHeading.hidden = true;
+    if (remoteEl) {
+      remoteEl.replaceChildren();
+      if (activeSource === "waymakers") {
+        remoteEl.hidden = true;
+      } else {
+        remoteEl.hidden = false;
+        var checking = document.createElement("p");
+        checking.className = "jobs-loading";
+        checking.setAttribute("role", "status");
+        checking.textContent =
+          activeSource === "linkedin"
+            ? "Checking LinkedIn…"
+            : activeSource === "indeed"
+              ? "Checking Indeed…"
+              : "Checking Indeed and LinkedIn…";
+        remoteEl.appendChild(checking);
+      }
+    }
     if (results) {
       results.innerHTML =
         '<p class="jobs-loading" role="status">Loading openings…</p>';
@@ -445,18 +603,46 @@
     if (empty) empty.hidden = true;
 
     gatherJobs(activeFilter, activeLocation, activeSource).then(function (
-      jobs
+      payload
     ) {
       if (token !== loadToken || !shellRoot) return;
+      var jobs = (payload && payload.waymakers) || [];
+      var feeds = (payload && payload.feeds) || [];
+      var showRemote = activeSource !== "waymakers";
+      var showLocal = activeSource !== "indeed" && activeSource !== "linkedin";
+      paintRemote(feeds, showRemote);
+      var localHeading = shellRoot.querySelector("[data-jobs-local-heading]");
+      if (localHeading) {
+        localHeading.hidden = !(showLocal && showRemote && jobs.length);
+      }
+      var visible = showLocal ? jobs : [];
+      var openingCount = visible.length + listingCount(feeds);
+      var pluginLive = feeds.some(function (feed) {
+        return feed && feed.mode === "plugin";
+      });
+      var countLabel =
+        openingCount === 1
+          ? "1 opening"
+          : openingCount + " openings";
+      if (openingCount === 0 && pluginLive) countLabel = "Indeed remote search loaded";
+      if (openingCount === 0 && !pluginLive && !showLocal) {
+        countLabel = "Remote feeds not configured";
+      }
       updateFilterChrome(
         shellRoot,
         activeFilter,
         activeLocation,
         activeSource,
-        jobs.length
+        countLabel
       );
       if (results && empty) {
-        renderJobs(results, empty, jobs, activeFilter);
+        if (!showLocal) {
+          results.innerHTML = "";
+          results.hidden = true;
+          empty.hidden = true;
+        } else {
+          renderJobs(results, empty, visible, activeFilter);
+        }
       }
     });
 

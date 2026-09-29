@@ -1,0 +1,16 @@
+# Cloudflare Pages / Functions env for CAREER remote jobs.
+# Copy to .dev.vars for `wrangler pages dev`. Never commit .dev.vars or real values.
+#
+# Indeed — BOTH required. Partner approval required (Publisher JavaScript plugin).
+# https://docs.indeed.com/indeed-plus/publisher-js-plugin/
+# INDEED_PUBLISHER_ID and INDEED_API_KEY are ignored (retired search API).
+INDEED_PARTNER_APP_ID=
+INDEED_PLACEMENT_ID=
+#
+# LinkedIn — set LINKEDIN_ACCESS_TOKEN, or both CLIENT_ID and CLIENT_SECRET.
+# Partner approval would still be required, and LinkedIn has no job-search read API.
+# With these set, /api/jobs returns mode partner_blocked and zero listings.
+# https://learn.microsoft.com/en-us/linkedin/talent/job-postings/api/overview
+LINKEDIN_CLIENT_ID=
+LINKEDIN_CLIENT_SECRET=
+LINKEDIN_ACCESS_TOKEN=
