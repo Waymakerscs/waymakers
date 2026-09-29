@@ -180,10 +180,20 @@
       return res.json().catch(function () {
         return null;
       }).then(function (body) {
+        // A missing Function (static preview, or Pages before this route ships)
+        // is the same fail-closed state as a host with no API key. Google's own
+        // errors are translated by the Function and are not 404s.
+        if (res.status === 404) {
+          return {
+            ok: false,
+            configured: false,
+            mode: "unconfigured",
+            listings: [],
+            message:
+              "Google Places is not configured. Waymakers will not show demo listings as businesses near you.",
+          };
+        }
         if (!body || typeof body !== "object") {
-          if (res.status === 404) {
-            return { ok: false, configured: false, mode: "unconfigured", listings: [] };
-          }
           return { ok: false, configured: true, mode: "error", listings: [] };
         }
         return body;

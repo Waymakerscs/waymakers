@@ -173,6 +173,21 @@ run(pages.loadPagesView("All categories", "", { ok: false, reason: "denied" }), 
   .then(function (chicagoUnconfigured) {
     assert.strictEqual(chicagoUnconfigured.listings.length, 0);
     assert.strictEqual(chicagoUnconfigured.mode, "unconfigured");
+    global.fetch = function () {
+      return Promise.resolve({
+        status: 404,
+        json: async function () {
+          return { error: { code: "not_found", message: "The requested path could not be found" } };
+        },
+      });
+    };
+    return pages.loadPagesView("All categories", "", { ok: true, lat: OKC.lat, lng: OKC.lng });
+  })
+  .then(function (missingFunction) {
+    assert.strictEqual(missingFunction.mode, "unconfigured");
+    assert.strictEqual(missingFunction.listings.length, 0);
+    assert.ok(/not configured/i.test(missingFunction.message));
+    assert.ok(!missingFunction.listings.some(function (item) { return /Chicago/.test(item.address || ""); }));
     global.fetch = function (requestUrl) {
       assert.ok(String(requestUrl).indexOf("/api/pages?") === 0);
       assert.ok(String(requestUrl).indexOf("googleapis") === -1);
