@@ -131,7 +131,7 @@ Adapter: `js/well-calendar-connect.js` (`WellCalendarConnect.useAdapter` is the 
 
 - Project ref: `gjrxweezprhiosqewiah` (org COG-NATION) — **separate from Cognation**
 - Browser config: `js/cognation-config.js` → `https://gjrxweezprhiosqewiah.supabase.co`
-- Site sign-in is WAYMAKERS Supabase. Local demo of the site shell is `?demo=1` or **Demo unlock** (`waymakers.demo.unlock.v1`). That does not unlock WELL.
+- Site sign-in is WAYMAKERS Supabase. Local demo of the site shell is `?demo=1` only (`waymakers.demo.unlock.v1`). The public login gate has no Demo unlock control. That does not unlock WELL.
 - WELL has two second locks, one per portal. `POST /api/well-auth` requires `side` (`patient` or `provider`) on the password step and the one-time-code step. Challenge tickets are bound to that side. Unlocking Patient does not open Provider. No WELL password or fixed code ships in static assets. The chart is still a demo EHR, not HIPAA; PHI must not leave the browser.
 - Cloudflare Pages env (never commit the values):
 
