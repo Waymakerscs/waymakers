@@ -33,6 +33,11 @@
     statusEl.hidden = !msg;
     statusEl.textContent = msg || "";
     statusEl.classList.toggle("is-error", !!isError);
+    if (msg && typeof statusEl.scrollIntoView === "function") {
+      try {
+        statusEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+      } catch (e) {}
+    }
   }
 
   function readProfile() {
