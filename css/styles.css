@@ -6406,6 +6406,73 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   border-radius: var(--radius-sm);
 }
 
+.well-working-as {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem 0.15rem;
+}
+
+.well-working-as select {
+  max-width: 22rem;
+  font: inherit;
+}
+
+.well-visit-context {
+  margin: 0;
+  padding: 0.45rem 1rem;
+  font-size: 0.84rem;
+  color: var(--well-ink);
+  background: #f4f7f8;
+  border-bottom: 1px solid var(--well-line);
+}
+
+.well-soap-form {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+}
+
+.well-soap-form textarea {
+  width: 100%;
+  font: inherit;
+}
+
+.well-soap-note {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+  border: 1px solid var(--well-line);
+  border-radius: var(--radius-sm);
+}
+
+.well-soap-note header {
+  margin-bottom: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.well-soap-note p {
+  margin: 0.2rem 0;
+}
+
+.well-soap-note p span {
+  display: inline-block;
+  width: 1.1rem;
+  font-weight: 700;
+  color: var(--well-teal);
+}
+
+.well-release-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: end;
+  margin-top: 0.5rem;
+}
+
+.well-release-form select {
+  font: inherit;
+}
+
 .well-doc-lead {
   margin: 0 0 0.85rem;
   font-size: 0.88rem;
@@ -7336,6 +7403,51 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 
 .well-book .well-field {
   margin-bottom: 0.45rem;
+}
+
+.well-doc-schedules {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+}
+
+.well-doc-schedule h6 {
+  margin: 0 0 0.35rem;
+  font-size: 0.84rem;
+}
+
+.well-doc-schedule-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.well-sched-book,
+.well-sched-held {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: var(--radius-sm);
+  padding: 0.28rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.well-sched-book {
+  border: 1px solid var(--well-line);
+  background: #fff;
+  color: var(--well-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.well-sched-book-go {
+  font-weight: 700;
+  color: var(--well-teal);
+}
+
+.well-sched-held {
+  color: var(--well-muted);
+  background: #eef2f4;
 }
 
 .well-book .well-field label {

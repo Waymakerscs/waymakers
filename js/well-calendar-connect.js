@@ -620,6 +620,39 @@
     return { slots: slots, held: held };
   }
 
+  /**
+   * One doctor's clinic day. Open rows are bookable. Held rows are Busy or
+   * the viewer's own visit. Other patients' names and reasons are not copied.
+   */
+  function daySchedule(opts) {
+    opts = opts || {};
+    var dateIso = opts.dateIso;
+    var clinicianId = opts.clinicianId || DEFAULT_CLINICIAN_ID;
+    return slotStarts(dateIso).map(function (startMin) {
+      var time = minToTime(startMin);
+      var block = slotBlock({
+        dateIso: dateIso,
+        startMin: startMin,
+        clinicianId: clinicianId,
+        appointments: opts.appointments || [],
+        connected: !!opts.connected,
+        patientId: opts.patientId || "",
+        patientName: opts.patientName || "",
+        includePatientOutlook: !!opts.includePatientOutlook,
+        blockOwnVisits: opts.blockOwnVisits !== false,
+        legacyOwnerId: opts.legacyOwnerId || "p1",
+      });
+      return {
+        dateIso: dateIso,
+        time: time,
+        label: formatTimeLabel(time),
+        clinicianId: clinicianId,
+        open: !block,
+        kind: block ? block.kind : "open",
+      };
+    });
+  }
+
   function useAdapter(adapter) {
     if (!adapter) {
       activeAdapter = builtinAdapter;
@@ -665,6 +698,7 @@
     viewerOwns: viewerOwns,
     presentForRole: presentForRole,
     searchOpenings: searchOpenings,
+    daySchedule: daySchedule,
     useAdapter: useAdapter,
   };
 
