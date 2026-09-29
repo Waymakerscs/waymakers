@@ -11643,7 +11643,7 @@ body:has(.waymakers-masthead) .site-header {
   #main .tabs-section { margin-top: -0.2rem; }
 }
 
-/* Holographic north star — soft four-point silver glints under WAYMAKERS.
+/* Holographic north star — three soft four-point silver glints under WAYMAKERS.
    Idle is a calm halo and a slow sheen. Hover brightens that shimmer only.
    No compass rays, no yellow. prefers-reduced-motion freezes the sheen. */
 .wm-wordmark {
@@ -11699,9 +11699,8 @@ body:has(.waymakers-masthead) .site-header {
   width: 100%;
   height: 100%;
   filter:
-    drop-shadow(0 1px 1px rgba(36, 48, 68, 0.28))
-    drop-shadow(0 0 12px rgba(186, 214, 236, 0.55))
-    drop-shadow(0 0 26px rgba(214, 186, 224, 0.28));
+    drop-shadow(0 1px 1px rgba(48, 60, 78, 0.22))
+    drop-shadow(0 0 8px rgba(186, 204, 220, 0.42));
   transition: filter 280ms ease;
 }
 
@@ -11748,10 +11747,9 @@ body:has(.waymakers-masthead) .site-header {
 .wm-wordmark:hover .wm-north-star-img,
 .wm-wordmark:focus-visible .wm-north-star-img {
   filter:
-    drop-shadow(0 1px 1px rgba(36, 48, 68, 0.3))
-    drop-shadow(0 0 10px rgba(255, 255, 255, 0.85))
-    drop-shadow(0 0 18px rgba(186, 220, 238, 0.62))
-    drop-shadow(0 0 32px rgba(214, 186, 224, 0.36));
+    drop-shadow(0 1px 1px rgba(48, 60, 78, 0.24))
+    drop-shadow(0 0 6px rgba(255, 255, 255, 0.8))
+    drop-shadow(0 0 14px rgba(186, 206, 224, 0.5));
 }
 
 .wm-wordmark:hover .wm-north-star-sheen,
@@ -11800,9 +11798,8 @@ body:has(.waymakers-masthead) .site-header {
   .wm-wordmark:hover .wm-north-star-img,
   .wm-wordmark:focus-visible .wm-north-star-img {
     filter:
-      drop-shadow(0 1px 1px rgba(36, 48, 68, 0.28))
-      drop-shadow(0 0 12px rgba(186, 214, 236, 0.55))
-      drop-shadow(0 0 26px rgba(214, 186, 224, 0.28));
+      drop-shadow(0 1px 1px rgba(48, 60, 78, 0.22))
+      drop-shadow(0 0 8px rgba(186, 204, 220, 0.42));
   }
 }
 
