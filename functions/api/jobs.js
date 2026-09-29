@@ -1,148 +1,59 @@
 /**
- * GET /api/jobs?source=indeed|linkedin&location=&q=
+ * GET /api/jobs?source=indeed|linkedin&q=&location=
  *
- * Proxy stub for Indeed Publisher / LinkedIn Jobs when secrets exist on the
- * Pages project. Client never holds API secrets — only optional public IDs
- * in js/cognation-config.js (WAYMAKERSConfig.jobs).
+ * Remote-only Indeed and LinkedIn for the CAREER tab. Secrets stay in
+ * Cloudflare Pages env. The browser never receives client secrets or tokens.
  *
- * Env (Cloudflare Pages → Settings → Environment variables):
- *   INDEED_PUBLISHER_ID   — Indeed Publisher / affiliate public id (server-held)
- *   INDEED_API_KEY        — if Indeed issues a secret for your account
- *   LINKEDIN_CLIENT_ID    — LinkedIn partner app (Jobs API is partner-gated)
+ *   INDEED_PARTNER_APP_ID
+ *   INDEED_PLACEMENT_ID
+ *   LINKEDIN_CLIENT_ID
  *   LINKEDIN_CLIENT_SECRET
- *   LINKEDIN_ACCESS_TOKEN — or use OAuth flow when partnership is approved
+ *   LINKEDIN_ACCESS_TOKEN
  *
- * Without credentials: returns mode "deeplink" with honest search URLs
- * (same as the client adapter). Never scrapes HTML as the permanent path.
+ * `remote` is always forced on. Missing keys return mode "not_configured"
+ * and an empty jobs array. LinkedIn credentials still return mode
+ * "partner_blocked" because LinkedIn has no job-search read API.
+ * See functions/lib/jobs-sources.js and functions/README.md.
  */
 
-function corsHeaders() {
+import { buildJobsPayload } from "../lib/jobs-sources.js";
+
+function headersFor(mode) {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
-    "Cache-Control": "public, max-age=300",
+    "Cache-Control": mode === "plugin" ? "private, max-age=60" : "no-store",
   };
-}
-
-function indeedSearchUrl(location, q) {
-  const params = new URLSearchParams();
-  params.set("q", q || "healthcare");
-  params.set("l", location || "Chicago, IL");
-  return "https://www.indeed.com/jobs?" + params.toString();
-}
-
-function linkedinSearchUrl(location, q) {
-  const params = new URLSearchParams();
-  params.set("keywords", q || "healthcare");
-  params.set("location", location || "Chicago, IL");
-  return "https://www.linkedin.com/jobs/search/?" + params.toString();
-}
-
-function deeplinkPayload(source, location, q) {
-  const url =
-    source === "linkedin"
-      ? linkedinSearchUrl(location, q)
-      : indeedSearchUrl(location, q);
-  return {
-    ok: true,
-    mode: "deeplink",
-    source,
-    location,
-    q,
-    message:
-      "Not live. This Function is deeplink-only and does not return job listings. Open the search URL on " +
-      (source === "linkedin" ? "LinkedIn" : "Indeed") +
-      ".",
-    searchUrl: url,
-    jobs: [],
-  };
-}
-
-/**
- * Placeholder for a real Indeed Publisher Job Search call.
- * Wire the official endpoint here once you have a publisher account —
- * do not HTML-scrape indeed.com.
- */
-async function fetchIndeedListings(env, location, q) {
-  const publisherId = env.INDEED_PUBLISHER_ID || "";
-  if (!publisherId) return null;
-  // Stub: credentials present but live HTTP not wired in v1.
-  // Return null so the client falls back to deep-link cards until the
-  // official Publisher Job Search URL + params are confirmed for your account.
-  void q;
-  void location;
-  void env.INDEED_API_KEY;
-  return null;
-}
-
-/**
- * Placeholder for LinkedIn partner Jobs API.
- */
-async function fetchLinkedInListings(env, location, q) {
-  const ready =
-    env.LINKEDIN_ACCESS_TOKEN ||
-    (env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET);
-  if (!ready) return null;
-  void q;
-  void location;
-  return null;
 }
 
 export async function onRequestOptions() {
-  return new Response(null, { status: 204, headers: corsHeaders() });
+  return new Response(null, { status: 204, headers: headersFor("not_configured") });
 }
 
 export async function onRequestGet(context) {
-  const url = new URL(context.request.url);
-  const source = (url.searchParams.get("source") || "indeed").toLowerCase();
-  const location = (url.searchParams.get("location") || "Chicago, IL").trim();
-  const q = (url.searchParams.get("q") || "healthcare").trim();
-  const env = context.env || {};
+  var url = new URL(context.request.url);
+  var source = (url.searchParams.get("source") || "").toLowerCase();
+  var location = url.searchParams.get("location") || "";
+  var q = url.searchParams.get("q") || "";
+  var env = (context && context.env) || {};
 
   try {
-    if (source === "indeed") {
-      const listings = await fetchIndeedListings(env, location, q);
-      if (listings && listings.length) {
-        return Response.json(
-          { ok: true, mode: "listings", source, location, q, jobs: listings },
-          { headers: corsHeaders() }
-        );
-      }
-      return Response.json(deeplinkPayload("indeed", location, q), {
-        headers: corsHeaders(),
-      });
-    }
-
-    if (source === "linkedin") {
-      const listings = await fetchLinkedInListings(env, location, q);
-      if (listings && listings.length) {
-        return Response.json(
-          { ok: true, mode: "listings", source, location, q, jobs: listings },
-          { headers: corsHeaders() }
-        );
-      }
-      return Response.json(deeplinkPayload("linkedin", location, q), {
-        headers: corsHeaders(),
-      });
-    }
-
+    var payload = buildJobsPayload(source, env, q, location);
+    var status = payload.mode === "error" ? 400 : 200;
+    return Response.json(payload, { status: status, headers: headersFor(payload.mode) });
+  } catch (e) {
+    void e;
     return Response.json(
       {
         ok: false,
-        error: "Unknown source. Use source=indeed or source=linkedin.",
+        mode: "error",
+        source: source,
+        remote: true,
         jobs: [],
+        message: "The jobs API failed closed and did not return listings.",
       },
-      { status: 400, headers: corsHeaders() }
-    );
-  } catch (err) {
-    return Response.json(
-      {
-        ok: false,
-        error: String(err && err.message ? err.message : err),
-        jobs: [],
-      },
-      { status: 500, headers: corsHeaders() }
+      { status: 500, headers: headersFor("error") }
     );
   }
 }

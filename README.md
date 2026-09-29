@@ -14,7 +14,7 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
   - **WELL** — company/provider UI (EHR demo chart, roster, doctor→patient messages, audit-only doctor notes, Apple Health consent + export upload)
   - **PAGES** — local directory of what’s available (`pages.js`). Listings appear only after the browser shares a location, and only within 25 miles of that point. Denied or unavailable location asks you to enable it and does not substitute Chicago or any other city. **Directions** is turn-by-turn: Apple Maps `?daddr=&dirflg=d` on iPhone, iPad, and desktop; Google Maps `dir_action=navigate` on Android. No usable street address means no Directions control.
   - **HOME** — empty placeholder (content TBD)
-  - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); openings keyed by `companyId`, plus Indeed / LinkedIn by location
+  - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); Waymakers openings keyed by `companyId`, plus remote-only Indeed and LinkedIn
 - Tower, Commune, badges, and widgets are **not** included
 
 ## Company identity (Well ↔ Jobs ↔ Pages)
@@ -29,54 +29,51 @@ Shared registry: `js/companies.js` (`WaymakersCompanies`).
 
 Deep link: `#jobs/<companyId>` (also `#jobs` for all). API: `WaymakersJobs.filterByCompany(id)`.
 
-## CAREER / JOBS sources (v1)
+## CAREER / remote jobs (Indeed + LinkedIn)
 
 Filters on the CAREER tab (jobs panel):
 
 | Filter | Values |
 | --- | --- |
-| Company | Waymakers companies (`companyId`, same as WELL / PAGES) |
-| Location | City / region / zip (filters demo openings; passed into Indeed / LinkedIn search URLs) |
+| Company | Waymakers companies (`companyId`, same as WELL / PAGES). Passed as the keyword for Indeed / LinkedIn. |
+| Location | City / region / zip. Filters Waymakers openings. Added as an Indeed / LinkedIn keyword. It does **not** turn remote off. |
 | Source | `waymakers` \| `indeed` \| `linkedin` (or all) |
 
-### Behavior without API keys (default)
+Indeed and LinkedIn results are **remote only**. Waymakers company openings stay on the board as local demo posts. No other job board is used as a stand-in.
 
-- **Waymakers** — demo openings from local companies (companyId-linked).
-- **Indeed / LinkedIn** — clearly labeled **External** cards that deep-link to public search pages filtered by location (and company name when a company filter is active). Honest search links — **not** fake scraped listings.
+### Behavior without keys (default — fail closed)
 
-LinkedIn Jobs API is **partner-gated**. Indeed’s Publisher / Job Search API needs a publisher account. We do **not** HTML-scrape either site as the permanent solution (brittle + ToS risk).
+`GET /api/jobs` returns `mode: "not_configured"`, `jobs: []`, and the env names that are missing. The CAREER tab shows that status. It does **not** invent listings, scrape HTML, or deep-link a search page as if it were a job.
 
-### Adding Indeed / LinkedIn keys later
+### Keys Alexa must set
 
-1. **Client (public IDs only)** — edit `js/cognation-config.js` → `WAYMAKERSConfig.jobs`:
+Cloudflare Pages → project **waymakers** → Settings → Environment variables (Production and Preview). Never commit the values. Names are also listed in `.dev.vars.example` (copy to `.dev.vars` for local `wrangler pages dev`; `.dev.vars` is gitignored).
 
-   ```js
-   jobs: {
-     defaultLocation: "Chicago, IL",
-     useApiProxy: true,          // try GET /api/jobs before deep-link fallback
-     apiProxyPath: "/api/jobs",
-     indeed: {
-       publisherId: "YOUR_PUBLIC_PUBLISHER_ID",
-       enabled: true,
-     },
-     linkedin: {
-       partnerConfigured: true,  // only after partnership + server secrets
-       enabled: true,
-     },
-   }
-   ```
+| Variable | Required | Partner approval |
+| --- | --- | --- |
+| `INDEED_PARTNER_APP_ID` | Yes, with the placement id, before Indeed can render | **Yes.** Indeed issues this for the [Publisher JavaScript plugin](https://docs.indeed.com/indeed-plus/publisher-js-plugin/). There is no self-serve job-search API. The Publisher program is not open self-serve. |
+| `INDEED_PLACEMENT_ID` | Yes, with the partner app id | **Yes.** Indeed issues the placement id with the plugin. |
+| `LINKEDIN_CLIENT_ID` | One of: this **and** `LINKEDIN_CLIENT_SECRET`, **or** `LINKEDIN_ACCESS_TOKEN` | **Yes, and it still will not list jobs.** LinkedIn has no public job-search API. |
+| `LINKEDIN_CLIENT_SECRET` | With `LINKEDIN_CLIENT_ID`, unless a token is set | Same as above. Secret stays on the server and is never returned to the browser. |
+| `LINKEDIN_ACCESS_TOKEN` | Alternative to client id + secret | Same blocker. [Job Posting API](https://learn.microsoft.com/en-us/linkedin/talent/job-postings/api/overview) is write-only, partner-gated, and **not accepting new partnerships** (request Apply Connect). |
 
-2. **Server secrets** — Cloudflare Pages → **waymakers** project → Settings → Environment variables (never commit these):
+Do **not** set these expecting a live search. They are ignored:
 
-   | Variable | Purpose |
-   | --- | --- |
-   | `INDEED_PUBLISHER_ID` | Indeed Publisher / affiliate id |
-   | `INDEED_API_KEY` | Optional secret if Indeed issues one |
-   | `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` / `LINKEDIN_ACCESS_TOKEN` | LinkedIn partner Jobs API |
+| Variable | Why it is ignored |
+| --- | --- |
+| `INDEED_PUBLISHER_ID` | Retired Publisher search API. Not called. |
+| `INDEED_API_KEY` | Same. Not a current job-search credential. |
 
-3. **Wire the live HTTP calls** inside `functions/api/jobs.js` (`fetchIndeedListings` / `fetchLinkedInListings`) once your account’s official endpoints are confirmed. Until then the Function returns `mode: "deeplink"` and the UI keeps showing external search cards.
+### What happens after the keys are set
 
-4. Redeploy Pages so `functions/` ships with the site (see Deploy below). Details: `functions/README.md`.
+- **Indeed** — `mode: "plugin"`. The page loads only `https://plugins.indeed.com/publisher-plugin/main.js` and sets the documented location field to `Remote`. A typed city is a keyword (`data-indeed-search-what`), not a replacement for Remote. Indeed renders the jobs. The plugin’s published attributes do not include a separate workplace flag; Remote is the documented location value.
+- **LinkedIn** — `mode: "partner_blocked"`, `jobs: []`, even when credentials are present. The intended query is `workplaceTypes: ["Remote"]`. There is no official search endpoint to call, so the adapter does not scrape `linkedin.com` and does not substitute another board.
+
+Job Sync (`https://docs.indeed.com/job-sync-api/`) creates an employer’s own Indeed postings. It is not the public Indeed index and is not used here.
+
+The browser only needs `WAYMAKERSConfig.jobs.apiProxyPath` (`/api/jobs` in `js/cognation-config.js`). It does not store partner ids.
+
+Logic checks: `node functions/api/jobs.test.mjs`. Details: `functions/README.md`. Redeploy Pages so `functions/` ships with the site.
 
 ## WELL · Apple Health (v1)
 

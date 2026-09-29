@@ -7,29 +7,16 @@
     supabasePublishableKey: "sb_publishable_e2RscJkopr3yxC0mqa9GfQ_bSmNq-c9",
 
     /**
-     * JOBS board — public IDs only in the client.
-     * Secrets (Indeed API keys, LinkedIn client secrets / tokens) belong in
-     * Cloudflare Pages env vars consumed by functions/api/jobs.js.
+     * CAREER board. Partner secrets are not stored here.
+     * Cloudflare Pages env (functions/api/jobs.js): INDEED_PARTNER_APP_ID,
+     * INDEED_PLACEMENT_ID, LINKEDIN_CLIENT_ID, LINKEDIN_CLIENT_SECRET,
+     * LINKEDIN_ACCESS_TOKEN. Missing keys fail closed. See .dev.vars.example.
      */
     jobs: {
       defaultLocation: "Chicago, IL",
-      /** When true, adapters try GET /api/jobs before falling back to deep-links. */
-      useApiProxy: false,
+      /** CAREER always calls this path. There is no deep-link fallback. */
+      useApiProxy: true,
       apiProxyPath: "/api/jobs",
-      indeed: {
-        /** Public Publisher / affiliate id only — leave empty until you have one. */
-        publisherId: "",
-        publicId: "",
-        enabled: false,
-      },
-      linkedin: {
-        /**
-         * LinkedIn Jobs API is partner-gated. Flip partnerConfigured + enabled
-         * only after Cloudflare env has LINKEDIN_* secrets and the proxy is wired.
-         */
-        partnerConfigured: false,
-        enabled: false,
-      },
     },
   });
   window.WAYMAKERSConfig = next;

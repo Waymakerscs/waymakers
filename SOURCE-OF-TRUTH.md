@@ -59,7 +59,7 @@ Two locks. They are not the same control.
 
 | Surface | Status |
 | --- | --- |
-| CAREER Indeed / LinkedIn | Deeplink only. `functions/api/jobs.js` is not a live listings API. |
+| CAREER Indeed / LinkedIn | Remote only. Fail closed until Pages env is set. Indeed mounts the official Publisher plugin after partner approval. LinkedIn has no job-search read API, so credentials still return no listings. No scrape and no substitute boards. |
 | CAREER Waymakers Apply | Local demo. Not a live application. |
 | Apple Health | Local demo · manual export only. No live HealthKit sync. |
 | HOME | Not live. Post-sign-in hub is still missing. |
