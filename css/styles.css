@@ -10264,7 +10264,8 @@ textarea::placeholder { color: rgba(242, 246, 255, 0.48) !important; }
 .commune-swipe-title,
 .pages-title,
 .well-title,
-.jobs-title {
+.jobs-title,
+.desk-title {
   color: #fff !important;
   font-weight: 600;
   letter-spacing: -0.04em;
@@ -10658,7 +10659,8 @@ body {
 .pages-title,
 .paper-title,
 .well-title,
-.jobs-title {
+.jobs-title,
+.desk-title {
   color: #fff !important;
   font-family: var(--cgn-ui) !important;
   font-size: clamp(1.8rem, 4vw, 3.6rem) !important;
@@ -10738,7 +10740,8 @@ body {
   .pages-title,
   .paper-title,
   .well-title,
-  .jobs-title { font-size: clamp(1.8rem, 10vw, 2.75rem) !important; }
+  .jobs-title,
+  .desk-title { font-size: clamp(1.8rem, 10vw, 2.75rem) !important; }
 }
 
 /* Load-in identity: the brain is reserved for entry, not the working interface. */
@@ -11382,7 +11385,8 @@ body > * {
 .jobs-shell h3,
 .well-title,
 .jobs-title,
-.pages-title {
+.pages-title,
+.desk-title {
   color: #000 !important;
   letter-spacing: -0.075em !important;
   text-shadow: 0 0 14px rgba(0, 0, 0, 0.14);
@@ -12092,6 +12096,7 @@ dt, dd, figcaption, time, address, cite, dfn, abbr, q, s, mark,
 .well-title,
 .jobs-title,
 .pages-title,
+.desk-title,
 .jobs-dek,
 .jobs-role-note,
 .jobs-count,
@@ -12297,16 +12302,21 @@ textarea::placeholder {
   background-color: rgba(236, 242, 248, 0.72) !important;
 }
 
-/* DESK v1 — blank white empty page beside WELL. No copy, cards, or widgets. */
+/* DESK v1 — blank white page beside WELL. Title only. No body copy, cards, or widgets. */
 #panel-desk.desk-blank {
   min-height: 70vh;
   margin: 0;
-  padding: 0;
+  padding: clamp(1rem, 2.5vw, 1.6rem);
   border: 0 !important;
   background: #fff !important;
   background-color: #fff !important;
   background-image: none !important;
   box-shadow: none !important;
+}
+
+.desk-title {
+  margin: 0;
+  text-transform: uppercase;
 }
 
 .tabs.tabs--chrome .tab-panels:has(#panel-desk:not([hidden])) {
