@@ -11397,7 +11397,7 @@ body > * {
 .waymakers-masthead {
   position: relative;
   z-index: 0;
-  min-height: clamp(280px, 36vw, 460px);
+  min-height: 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(255, 255, 255, 0.65);
   background:
@@ -11448,10 +11448,10 @@ body > * {
   position: relative;
   z-index: 1;
   display: grid;
-  min-height: inherit;
+  min-height: 0;
   max-width: 1240px;
   margin: 0 auto;
-  padding: clamp(2rem, 5vw, 4rem) clamp(1rem, 4vw, 3rem) 1.25rem;
+  padding: clamp(1.75rem, 4vw, 3.25rem) clamp(1rem, 4vw, 3rem) 2.35rem;
   justify-items: center;
   align-content: start;
 }
@@ -11469,6 +11469,9 @@ body > * {
 }
 
 .waymakers-masthead-home {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
   margin-top: clamp(0.85rem, 2.5vw, 1.75rem);
   color: #000 !important;
   font-family: "Oswald", system-ui, sans-serif !important;
@@ -11502,7 +11505,7 @@ body > * {
 #main .tabs-section {
   position: relative;
   z-index: 2;
-  margin-top: clamp(-2.5rem, -4vw, -3.5rem);
+  margin-top: -0.35rem;
 }
 
 .wm-empty-panel {
@@ -11521,10 +11524,213 @@ body:has(.waymakers-masthead) .site-header {
 }
 
 @media (max-width: 720px) {
-  .waymakers-masthead { min-height: 240px; }
-  .waymakers-masthead-inner { padding-top: 2rem; }
+  .waymakers-masthead { min-height: 0; }
+  .waymakers-masthead-inner { padding-top: 1.6rem; padding-bottom: 1.75rem; }
   .waymakers-masthead-home { font-size: clamp(2.4rem, 14vw, 4.6rem) !important; letter-spacing: -0.09em !important; }
-  #main .tabs-section { margin-top: -2rem; }
+  .waymakers-masthead .wm-north-star { width: min(13.75rem, 62vw); }
+  #main .tabs-section { margin-top: -0.2rem; }
+}
+
+/* Holographic north star — under-mark for the WAYMAKERS wordmark.
+   Idle is a static gem plus a quiet flare. Hover on the wordmark
+   brightens the flare and sweeps a sheen. No idle loop. */
+.wm-wordmark {
+  position: relative;
+}
+
+.login-gate-brand--splash .wm-wordmark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+}
+
+.wm-north-star {
+  position: relative;
+  display: block;
+  /* Cognation brain is ~276px tall (610px × 7.25/16). Match that companion height. */
+  width: min(17.5rem, 36vw);
+  aspect-ratio: 1;
+  margin: 0.1rem auto 0.2rem;
+  isolation: isolate;
+}
+
+.wm-north-star::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 8% 10%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(ellipse, rgba(125, 239, 255, 0.62), rgba(196, 132, 252, 0.32) 46%, transparent 72%);
+  filter: blur(16px);
+}
+
+.login-gate-brand--splash .wm-north-star {
+  /* Login brain height is 25rem × 8.1/16 ≈ 12.7rem. */
+  width: min(100%, 12.4rem);
+  margin-top: 0.2rem;
+}
+
+.wm-north-star-img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter:
+    drop-shadow(0 1px 1px rgba(15, 23, 42, 0.4))
+    drop-shadow(0 0 16px rgba(125, 239, 255, 0.82))
+    drop-shadow(0 0 42px rgba(199, 140, 255, 0.55));
+  transition: filter 220ms ease;
+}
+
+.wm-north-star-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: 146%;
+  height: 146%;
+  transform: translate(-50%, -50%);
+  opacity: 0.42;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0.95) 0deg,
+    rgba(34, 211, 238, 0.95) 4deg,
+    transparent 10deg,
+    transparent 39deg,
+    rgba(244, 114, 182, 0.7) 45deg,
+    transparent 51deg,
+    transparent 84deg,
+    rgba(255, 255, 255, 0.75) 90deg,
+    rgba(167, 139, 250, 0.8) 94deg,
+    transparent 101deg,
+    transparent 129deg,
+    rgba(251, 191, 36, 0.65) 135deg,
+    transparent 142deg,
+    transparent 174deg,
+    rgba(34, 211, 238, 0.55) 180deg,
+    transparent 187deg,
+    transparent 219deg,
+    rgba(232, 121, 249, 0.45) 225deg,
+    transparent 232deg,
+    transparent 264deg,
+    rgba(186, 230, 253, 0.7) 270deg,
+    transparent 277deg,
+    transparent 309deg,
+    rgba(253, 224, 71, 0.5) 315deg,
+    transparent 322deg,
+    transparent 350deg,
+    rgba(255, 255, 255, 0.95) 360deg
+  );
+  -webkit-mask-image: radial-gradient(circle, transparent 0 26%, #000 44%, #000 58%, transparent 76%);
+  mask-image: radial-gradient(circle, transparent 0 26%, #000 44%, #000 58%, transparent 76%);
+  transition: opacity 220ms ease;
+}
+
+.wm-north-star-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.38;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.15) 42%,
+    rgba(255, 255, 255, 0.92) 50%,
+    rgba(125, 243, 255, 0.45) 56%,
+    transparent 68%
+  );
+  background-size: 220% 100%;
+  background-position: 72% 0;
+  mix-blend-mode: soft-light;
+  -webkit-mask-image: url("../assets/wm-north-star.svg");
+  mask-image: url("../assets/wm-north-star.svg");
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.wm-wordmark:hover .wm-north-star::before,
+.wm-wordmark:focus-visible .wm-north-star::before {
+  background: radial-gradient(ellipse, rgba(210, 252, 255, 0.85), rgba(216, 160, 255, 0.5) 42%, rgba(251, 191, 36, 0.22) 64%, transparent 78%);
+}
+
+.wm-wordmark:hover .wm-north-star-img,
+.wm-wordmark:focus-visible .wm-north-star-img {
+  filter:
+    drop-shadow(0 1px 1px rgba(15, 23, 42, 0.45))
+    drop-shadow(0 0 8px rgba(255, 255, 255, 0.95))
+    drop-shadow(0 0 22px rgba(125, 239, 255, 0.95))
+    drop-shadow(0 0 58px rgba(199, 140, 255, 0.78))
+    drop-shadow(0 0 78px rgba(251, 191, 36, 0.4));
+}
+
+.wm-wordmark:hover .wm-north-star-rays,
+.wm-wordmark:focus-visible .wm-north-star-rays {
+  opacity: 0.92;
+}
+
+.wm-wordmark:hover .wm-north-star-sheen,
+.wm-wordmark:focus-visible .wm-north-star-sheen {
+  opacity: 0.95;
+  animation: wm-star-sheen 1.8s ease-in-out infinite;
+}
+
+@keyframes wm-star-sheen {
+  0% { background-position: 130% 0; }
+  100% { background-position: -40% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waymakers-masthead-home:hover,
+  .waymakers-masthead-home:focus-visible {
+    transform: none;
+  }
+
+  .wm-north-star-img,
+  .wm-north-star-rays,
+  .wm-north-star-sheen {
+    transition: none;
+    animation: none;
+  }
+
+  .wm-wordmark:hover .wm-north-star::before,
+  .wm-wordmark:focus-visible .wm-north-star::before {
+    background: radial-gradient(ellipse, rgba(125, 239, 255, 0.62), rgba(196, 132, 252, 0.32) 46%, transparent 72%);
+  }
+
+  .wm-wordmark:hover .wm-north-star-sheen,
+  .wm-wordmark:focus-visible .wm-north-star-sheen {
+    animation: none;
+    opacity: 0.38;
+  }
+
+  .wm-wordmark:hover .wm-north-star-rays,
+  .wm-wordmark:focus-visible .wm-north-star-rays {
+    opacity: 0.42;
+  }
+
+  .wm-wordmark:hover .wm-north-star-img,
+  .wm-wordmark:focus-visible .wm-north-star-img {
+    filter:
+      drop-shadow(0 1px 1px rgba(15, 23, 42, 0.4))
+      drop-shadow(0 0 16px rgba(125, 239, 255, 0.82))
+      drop-shadow(0 0 42px rgba(199, 140, 255, 0.55));
+  }
+}
+
+@media (max-width: 720px) {
+  .login-gate-brand--splash .wm-north-star {
+    width: min(100%, 9.6rem);
+  }
 }
 
 
