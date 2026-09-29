@@ -12710,9 +12710,9 @@ textarea::placeholder {
 }
 
 /* Sign-in feedback stays in view above the sticky Sign in control.
-   Status, Sign up, and Demo unlock live in the sticky dock so the
-   scrollable panel cannot cover them. Dark ink on an opaque chip
-   stays readable on the pale frosted card. */
+   Only the error chip, Sign in, and Sign up sit in the sticky dock.
+   Demo unlock stays outside it. Dark ink on an opaque chip stays
+   readable on the pale frosted card. */
 .login-form-actions {
   position: sticky;
   bottom: 0;
@@ -12738,13 +12738,6 @@ textarea::placeholder {
 }
 .login-form-actions .login-mode-toggle {
   margin: 0.55rem 0 0;
-}
-.login-form-actions .login-demo-unlock-row {
-  margin: 0.45rem 0 0;
-}
-.login-form-actions .login-demo-unlock-note,
-.login-form-actions .login-demo-storage-hint {
-  margin-top: 0.35rem;
 }
 
 /* DESK v1 — blank white empty page beside WELL. No copy, cards, or widgets. */
