@@ -221,24 +221,23 @@
           </select>
         </div>
 
-        <p id="login-status" class="login-status" hidden role="status" aria-live="polite"></p>
-
         <div class="form-actions login-form-actions">
+          <p id="login-status" class="login-status" hidden role="status" aria-live="polite"></p>
           <button type="submit" class="btn btn-primary login-submit-btn" data-login-submit>Sign in</button>
+          <p class="login-mode-toggle">
+            <button type="button" class="login-mode-link" data-login-mode-toggle>
+              Need an account? Sign up
+            </button>
+          </p>
+          <p class="login-demo-unlock-row">
+            <button type="button" class="btn btn-secondary login-demo-unlock" data-demo-unlock>Demo unlock</button>
+          </p>
+          <p class="form-hint login-demo-unlock-note">
+            Local demo — not production auth. Opens this browser session only. WELL keeps its own sign-in.
+          </p>
+          <p class="form-hint login-demo-hint" data-login-demo-hint hidden>Sign in with the email and password you used to create your WAYMAKERS account.</p>
+          <p class="form-hint login-demo-storage-hint">Your account is secured by WAYMAKERS sign-in.</p>
         </div>
-        <p class="login-mode-toggle">
-          <button type="button" class="login-mode-link" data-login-mode-toggle>
-            Need an account? Sign up
-          </button>
-        </p>
-        <p class="login-demo-unlock-row">
-          <button type="button" class="btn btn-secondary login-demo-unlock" data-demo-unlock>Demo unlock</button>
-        </p>
-        <p class="form-hint login-demo-unlock-note">
-          Local demo — not production auth. Opens this browser session only. WELL keeps its own sign-in.
-        </p>
-        <p class="form-hint login-demo-hint" data-login-demo-hint hidden>Sign in with the email and password you used to create your WAYMAKERS account.</p>
-        <p class="form-hint login-demo-storage-hint">Your account is secured by WAYMAKERS sign-in.</p>
       </form>
       </div>
     </div>
