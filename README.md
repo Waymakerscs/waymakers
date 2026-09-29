@@ -15,7 +15,7 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
   - **DESK** — Waymakers-only blank white empty page beside WELL (v1; no copy, cards, or widgets)
   - **PAGES** — local directory of what’s available (`pages.js`). Listings appear only after the browser shares a location, and only within 25 miles of that point. Denied or unavailable location asks you to enable it and does not substitute Chicago or any other city. Live results are Google Places via `GET /api/pages` (Pages Function). The key is Cloudflare Pages env `GOOGLE_PLACES_API_KEY` and is never sent to the browser. Without that key the tab stays empty and says Google Places is not configured — the Chicago sample catalog is not shown as nearby. That catalog is offline/dev only: open `?pagesDemo=1` (session key `waymakers.pages.demo.v1`). It is labeled “Demo catalog only — not live Google Places,” still needs this device’s location, and still uses the 25-mile radius, so a 405 (Oklahoma) device does not see Chicago samples. Site `?demo=1` does not turn the catalog on. **Directions** is turn-by-turn: Apple Maps `?daddr=&dirflg=d` on iPhone, iPad, and desktop; Google Maps `dir_action=navigate` on Android. No usable street address means no Directions control.
   - **HOME** — empty placeholder (content TBD)
-  - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); Waymakers openings keyed by `companyId`, plus remote-only Indeed and LinkedIn
+  - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); Waymakers openings keyed by `companyId`, plus remote-only Indeed and LinkedIn. Credentials and documents (licensure, credentialing, college degree, resume) stay in this browser only (`career-credentials.js`)
 - Tower, Commune, badges, and widgets are **not** included
 
 ## Company identity (Well ↔ Jobs ↔ Pages)
@@ -75,6 +75,23 @@ Job Sync (`https://docs.indeed.com/job-sync-api/`) creates an employer’s own I
 The browser only needs `WAYMAKERSConfig.jobs.apiProxyPath` (`/api/jobs` in `js/cognation-config.js`). It does not store partner ids.
 
 Logic checks: `node functions/api/jobs.test.mjs`. Details: `functions/README.md`. Redeploy Pages so `functions/` ships with the site.
+
+## CAREER · Credentials & documents (v1)
+
+On the CAREER tab, above the job filters. Not a new top-level tab.
+
+| Slot | Accepted files |
+| --- | --- |
+| Licensure | PDF or a photo (JPG, PNG, GIF, WEBP, BMP, TIFF, HEIC) |
+| Credentialing | PDF or a photo (same types) |
+| College degree | PDF or a photo (same types) |
+| Resume | PDF (preferred), DOC, or DOCX |
+
+Each slot holds one file. Add, replace, and remove update only that slot. Empty slots say nothing is saved yet.
+
+Files stay in this browser in IndexedDB (`waymakers.career.credentials.v1`), the same idea as the WELL Apple Health export. The section is labeled a local demo. There is no upload, email, background check, or job-board handoff. If IndexedDB is missing or the write fails, the section fails closed and saves nothing. Indeed and LinkedIn stay remote-only and fail closed as before.
+
+Logic checks: `node js/career-credentials.test.js`.
 
 ## WELL · Chart flow (v1)
 

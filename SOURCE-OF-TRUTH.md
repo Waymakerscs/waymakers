@@ -61,6 +61,7 @@ Two locks. They are not the same control.
 | --- | --- |
 | CAREER Indeed / LinkedIn | Remote only. Fail closed until Pages env is set. Indeed mounts the official Publisher plugin after partner approval. LinkedIn has no job-search read API, so credentials still return no listings. No scrape and no substitute boards. |
 | CAREER Waymakers Apply | Local demo. Not a live application. |
+| CAREER credentials | Local demo. Licensure, credentialing, college degree, and resume stay in this browser (IndexedDB). No upload, email, or job-board handoff. Fails closed if storage is unavailable. |
 | Apple Health | Local demo · manual export only. No live HealthKit sync. |
 | HOME | Not live. Post-sign-in hub is still missing. |
 | DESK | Waymakers only, beside WELL. v1 is a blank white empty page. No copy, cards, or widgets. |
