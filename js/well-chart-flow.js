@@ -191,8 +191,35 @@
     return snap;
   }
 
+  function fileSnapshot(portal) {
+    var uploads = portal && portal.appleHealth && portal.appleHealth.uploads;
+    if (!Array.isArray(uploads)) return [];
+    return uploads.map(function (file) {
+      return {
+        id: file && file.id ? String(file.id) : "",
+        name: file && file.name ? String(file.name) : "",
+      };
+    });
+  }
+
+  /** Chart fields plus files that stay on the patient record. */
+  function patientRecordSnapshot(portal) {
+    return { phi: phiSnapshot(portal), files: fileSnapshot(portal) };
+  }
+
+  /**
+   * Patient-driven share. A provider release is rejected and the record is
+   * left as it was, so patient data is not moved or orphaned.
+   */
   function releaseChart(portal, release) {
     var next = deepClone(portal || {});
+    if (release && release.by === "provider") {
+      return {
+        ok: false,
+        reason: "Only the patient can release this chart.",
+        portal: next,
+      };
+    }
     next.chart = deepClone((portal && portal.chart) || {});
     next.releases = Array.isArray(next.releases) ? next.releases : [];
     var clinicianId = release && String(release.clinicianId || "");
@@ -207,6 +234,18 @@
       clinicianName: String((release && release.clinicianName) || ""),
       at: String((release && release.at) || ""),
       by: "patient",
+    });
+    return { ok: true, portal: next };
+  }
+
+  /**
+   * Working-as switch. Changes who is reading. Does not clear the chart,
+   * files, or releases, and does not create a provider copy.
+   */
+  function providerSwitch(portal, clinicianId) {
+    var next = deepClone(portal || {});
+    next.prefs = Object.assign({}, next.prefs, {
+      activeClinicianId: String(clinicianId || ""),
     });
     return { ok: true, portal: next };
   }
@@ -287,7 +326,10 @@
     notesForPatient: notesForPatient,
     notesForVisit: notesForVisit,
     phiSnapshot: phiSnapshot,
+    fileSnapshot: fileSnapshot,
+    patientRecordSnapshot: patientRecordSnapshot,
     releaseChart: releaseChart,
+    providerSwitch: providerSwitch,
     isReleasedTo: isReleasedTo,
     providerMayViewChart: providerMayViewChart,
     resolveVisitChart: resolveVisitChart,

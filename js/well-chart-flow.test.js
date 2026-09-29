@@ -204,4 +204,76 @@ var prefsOnly = flow.guardProviderPortalWrite(released.portal, Object.assign({},
 assert.strictEqual(prefsOnly.phiRejected, false);
 assert.strictEqual(prefsOnly.portal.chart.vitals.bpSys, "128");
 
+var withFiles = JSON.parse(JSON.stringify(chart));
+withFiles.appleHealth = {
+  uploads: [
+    { id: "ah-1", name: "export.xml" },
+    { id: "ah-2", name: "ecg.pdf" },
+  ],
+};
+var recordBeforeSwitch = JSON.stringify(flow.patientRecordSnapshot(withFiles));
+var providerRelease = flow.releaseChart(withFiles, {
+  clinicianId: "emp-james",
+  clinicianName: "Dr. James Okonkwo, DO",
+  by: "provider",
+});
+assert.strictEqual(providerRelease.ok, false);
+assert.match(providerRelease.reason, /patient/);
+assert.strictEqual(providerRelease.portal.releases.length, 1, "a provider release does not add a share");
+assert.strictEqual(JSON.stringify(flow.patientRecordSnapshot(providerRelease.portal)), recordBeforeSwitch);
+assert.strictEqual(providerRelease.portal.chart.vitals.bpSys, "128");
+assert.deepStrictEqual(
+  flow.fileSnapshot(providerRelease.portal).map(function (file) { return file.name; }),
+  ["export.xml", "ecg.pdf"]
+);
+
+var patientShare = flow.releaseChart(withFiles, {
+  id: "rel-james-files",
+  clinicianId: "emp-james",
+  clinicianName: "Dr. James Okonkwo, DO",
+  at: "2026-09-29 11:05",
+  by: "patient",
+});
+assert.strictEqual(patientShare.ok, true);
+assert.strictEqual(patientShare.portal.releases.length, 2);
+assert.strictEqual(patientShare.portal.releases[1].by, "patient");
+assert.strictEqual(flow.phiSnapshot(patientShare.portal).vitals.bpSys, "128");
+assert.deepStrictEqual(
+  flow.fileSnapshot(patientShare.portal).map(function (file) { return file.name; }),
+  ["export.xml", "ecg.pdf"]
+);
+var jamesContinuity = flow.resolveVisitChart(patientShare.portal, "a1", "emp-james");
+assert.strictEqual(jamesContinuity.ok, true);
+assert.strictEqual(jamesContinuity.phi.vitals.bpSys, "128");
+assert.strictEqual(jamesContinuity.phi.meds[0].name, "Lisinopril");
+
+var switched = flow.providerSwitch(patientShare.portal, "emp-james");
+assert.strictEqual(switched.ok, true);
+assert.strictEqual(switched.portal.prefs.activeClinicianId, "emp-james");
+assert.strictEqual(
+  JSON.stringify(flow.patientRecordSnapshot(switched.portal)),
+  JSON.stringify(flow.patientRecordSnapshot(patientShare.portal)),
+  "switching the working doctor does not wipe the patient record"
+);
+assert.strictEqual(switched.portal.releases.length, 2);
+assert.strictEqual(switched.portal.chart.vitals.bpSys, "128");
+assert.strictEqual(switched.portal.appleHealth.uploads[0].id, "ah-1");
+
+var wiped = flow.guardProviderPortalWrite(switched.portal, {
+  patient: { name: "" },
+  chart: { vitals: {}, meds: [] },
+  releases: [],
+  appleHealth: { uploads: [] },
+  appointments: [],
+  prefs: { activeClinicianId: "emp-james", selectedAppointmentId: "a1" },
+});
+assert.strictEqual(wiped.phiRejected, true);
+assert.strictEqual(wiped.portal.chart.vitals.bpSys, "128");
+assert.strictEqual(wiped.portal.chart.meds[0].name, "Lisinopril");
+assert.strictEqual(wiped.portal.releases.length, 2);
+assert.strictEqual(wiped.portal.appleHealth.uploads.length, 2);
+assert.strictEqual(wiped.portal.appleHealth.uploads[0].name, "export.xml");
+assert.strictEqual(wiped.portal.patient.name, "Alexa J. Thomas");
+assert.strictEqual(wiped.portal.prefs.activeClinicianId, "emp-james");
+
 console.log("well-chart-flow.test.js: ok");

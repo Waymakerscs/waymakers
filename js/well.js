@@ -3321,7 +3321,7 @@
     return (
       '<section class="well-rail-card" data-well-release-card>' +
       "<h4>Release chart to the next doctor</h4>" +
-      '<p class="well-muted well-tiny">Your chart stays in this browser. Releasing lets that doctor read the same chart on a visit. It does not copy BP or meds into provider storage, and it does not empty the chart.</p>' +
+      '<p class="well-muted well-tiny">You release your chart and the files on it. They stay in this browser. The next doctor reads that same record on a visit. Releasing does not copy them into provider storage and does not empty them.</p>' +
       '<ul class="well-list">' +
       list +
       "</ul>" +
@@ -3340,12 +3340,13 @@
       var CC = window.WellCalendarConnect;
       var doc = CC && CC.staffById(clinicianId);
       var cur = PortalStore.get();
-      var phiBefore = chartFlow().phiSnapshot(cur);
+      var recordBefore = chartFlow().patientRecordSnapshot(cur);
       var result = chartFlow().releaseChart(cur, {
         id: newId("rel"),
         clinicianId: clinicianId,
         clinicianName: doc ? doc.name : clinicianId,
         at: nowStamp(),
+        by: "patient",
       });
       if (!result.ok) {
         setStatus(root, result.reason || "Could not release the chart.", true);
@@ -3357,14 +3358,16 @@
       }
       var saved = PortalStore.get();
       renderPatient(root, saved);
-      var phiAfter = chartFlow().phiSnapshot(saved);
-      if (JSON.stringify(phiBefore) !== JSON.stringify(phiAfter)) {
+      var recordAfter = chartFlow().patientRecordSnapshot(saved);
+      if (JSON.stringify(recordBefore) !== JSON.stringify(recordAfter)) {
         setStatus(root, "Release stopped — chart fields changed.", true);
         return;
       }
       setStatus(
         root,
-        "Chart released to " + (doc ? doc.name : "that doctor") + ". Your vitals and meds are still on this chart.",
+        "Chart and files released to " +
+          (doc ? doc.name : "that doctor") +
+          ". Your vitals, meds, and files are still on this chart.",
         false
       );
     });
@@ -3641,7 +3644,7 @@
         escapeHtml(visit.patientName || "This patient") +
         " has not released this chart to " +
         escapeHtml(clinician.name) +
-        ". The chart is still on the patient side. Releasing shares it and does not empty it.</p></div>";
+        ". The chart and files stay on the patient side. Switching doctors does not clear them. Only the patient can release them.</p></div>";
     } else if (sectionId === "soap") {
       chartBody = renderSoapEditor(data, visit, clinician);
     } else {
@@ -3708,9 +3711,15 @@
     if (whoSelect) {
       whoSelect.addEventListener("change", function () {
         var cur = PortalStore.get();
-        cur.prefs.activeClinicianId = whoSelect.value;
+        var before = chartFlow() ? chartFlow().patientRecordSnapshot(cur) : null;
+        if (chartFlow()) cur = chartFlow().providerSwitch(cur, whoSelect.value).portal;
+        else cur.prefs.activeClinicianId = whoSelect.value;
         PortalStore.save(cur, { actor: "provider" });
-        renderProvider(root, PortalStore.get());
+        var saved = PortalStore.get();
+        if (before && JSON.stringify(before) !== JSON.stringify(chartFlow().patientRecordSnapshot(saved))) {
+          return;
+        }
+        renderProvider(root, saved);
       });
     }
 

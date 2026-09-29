@@ -87,7 +87,7 @@ Local demo EHR. Not HIPAA. PHI stays in this browser.
 | `cognation.well.portal.v1` | Patient | Chart PHI (vitals, meds, allergies, and the rest) plus release shares |
 | `cognation.well.soap.v1` | Provider | SOAP notes only (S/O/A/P), tied to a visit |
 
-The patient picks a doctor by booking an open time on that doctor’s schedule. The provider opens the chart from that visit. They can read the patient’s chart after the patient has released it, and they can save SOAP for the visit. A provider save that includes BP, meds, or other PHI fields is rejected and is not written into the SOAP store. Releasing the chart to the next doctor adds a share. The next doctor reads the same vitals and meds. The chart is not cleared.
+The patient picks a doctor by booking an open time on that doctor’s schedule. The provider opens the chart from that visit. They can read the patient’s chart and files after the patient has released them, and they can save SOAP for the visit. A provider save that includes BP, meds, or other PHI fields is rejected and is not written into the SOAP store. Only the patient releases the chart and files. The next doctor reads the same record. Switching providers does not wipe it, and a provider release cannot move it off the patient chart.
 
 ## WELL · Apple Health (v1)
 
