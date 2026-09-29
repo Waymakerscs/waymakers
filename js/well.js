@@ -2487,30 +2487,79 @@
     );
   }
 
+  function renderDoctorDaySchedule(data, dateIso) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return "";
+    if (CC.isWeekend(dateIso)) {
+      return '<p class="well-muted well-tiny">Clinic is closed this day. Doctor schedules are weekdays.</p>';
+    }
+    var cc = CC.normalize(data.calendarConnect);
+    return (
+      '<div class="well-doc-schedules" data-well-doc-schedules>' +
+      CC.doctors()
+        .map(function (doc) {
+          var rows = CC.daySchedule({
+            dateIso: dateIso,
+            clinicianId: doc.id,
+            appointments: data.appointments || [],
+            connected: !!cc.connected,
+            patientId: "p1",
+            patientName: (data.patient && data.patient.name) || "",
+            includePatientOutlook: !!(cc.connected && cc.includePatientCalendar),
+            blockOwnVisits: true,
+          });
+          var body = rows
+            .map(function (row) {
+              if (row.open) {
+                return (
+                  '<button type="button" class="well-sched-book" data-well-book-slot="' +
+                  escapeHtml(row.dateIso + "|" + row.time) +
+                  '" data-well-book-doc="' +
+                  escapeHtml(doc.id) +
+                  '"><span>' +
+                  escapeHtml(row.label) +
+                  '</span><span class="well-sched-book-go">Book</span></button>'
+                );
+              }
+              var held = row.kind === "own-visit" ? "Your visit" : "Busy";
+              return (
+                '<span class="well-sched-held">' +
+                escapeHtml(row.label) +
+                " · " +
+                held +
+                "</span>"
+              );
+            })
+            .join("");
+          return (
+            '<section class="well-doc-schedule" data-well-doc-schedule="' +
+            escapeHtml(doc.id) +
+            '"><h6>' +
+            escapeHtml(doc.name) +
+            '</h6><div class="well-doc-schedule-slots">' +
+            body +
+            "</div></section>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
   function renderPatientBook(data) {
     var CC = window.WellCalendarConnect;
     if (!CC) return "";
     var cc = CC.normalize(data.calendarConnect);
+    var dateIso = (data.prefs && data.prefs.selectedCalDate) || "";
     return (
-      '<div class="well-book">' +
-      '<h5 class="well-cal-day-heading">Book a visit</h5>' +
+      '<div class="well-book" data-well-patient-book>' +
+      '<h5 class="well-cal-day-heading">Book on a doctor’s schedule</h5>' +
+      '<p class="well-muted well-tiny">Pick the doctor by booking an open time on their schedule for this day. That visit is the chart they open. Releasing your chart is separate, and it does not clear your chart.</p>' +
       '<div class="well-field"><label for="well-book-visit">Visit type</label>' +
       '<select id="well-book-visit" data-well-book-visit>' +
       visitOptions(cc.bookVisitType) +
       "</select></div>" +
-      '<div class="well-field"><label for="well-book-doc">Doctor</label>' +
-      '<select id="well-book-doc" data-well-book-clinician>' +
-      doctorOptions(cc.bookClinicianId) +
-      "</select></div>" +
-      '<div data-well-slot-mount>' +
-      renderSlotMount(data, "patient", {
-        clinicianId: cc.bookClinicianId,
-        visitType: cc.bookVisitType,
-        patientId: "p1",
-        patientName: (data.patient && data.patient.name) || "",
-        reason: (CC.visitById(cc.bookVisitType) || {}).label || "",
-      }) +
-      "</div>" +
+      renderDoctorDaySchedule(data, dateIso) +
       '<p class="well-muted well-tiny">' +
       escapeHtml(CC.CLINIC_HOURS_LABEL) +
       "</p></div>"
@@ -3034,6 +3083,34 @@
       });
     }
     bindSlotButtons(root, host, side);
+    host.querySelectorAll("[data-well-book-slot]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (side !== "patient") return;
+        var parts = String(btn.getAttribute("data-well-book-slot") || "").split("|");
+        var clinicianId = btn.getAttribute("data-well-book-doc") || "";
+        var CC = window.WellCalendarConnect;
+        var visitEl = host.querySelector("[data-well-book-visit]");
+        var visitType = visitEl && visitEl.value ? visitEl.value : "";
+        var visit = CC && CC.visitById(visitType);
+        var cur = PortalStore.get();
+        var doc = CC && CC.staffById(clinicianId);
+        if (!doc || doc.kind !== "doctor") return;
+        commitAppointment(cur, {
+          date: parts[0],
+          time: parts[1],
+          patientId: "p1",
+          patientName: (cur.patient && cur.patient.name) || "",
+          reason: (visit && visit.label) || "Visit",
+          where: (cur.provider && cur.provider.clinic) || "",
+          clinicianId: clinicianId,
+          clinicianName: doc.name,
+          visitType: visitType,
+          source: "patient-schedule",
+          actor: "patient",
+        });
+        rerenderSide(root, "patient");
+      });
+    });
   }
 
   function renderUpcomingAppointments(data) {
@@ -3311,7 +3388,7 @@
       '<aside class="well-side-rail" aria-label="Schedule, appointments, and messages">' +
       '<section class="well-rail-card well-rail-card--schedule" data-well-schedule-card>' +
       "<h4>Schedule</h4>" +
-      '<p class="well-muted well-tiny">Shared clinic calendar · book the next open visit with your doctor.</p>' +
+      '<p class="well-muted well-tiny">Pick a doctor by booking an open time on their schedule.</p>' +
       '<p class="well-privacy-note">Shared overlay is Busy / Free except your own calendar. Other people\u2019s titles, names, reasons, and notes stay hidden. Your visits and your Outlook events show in full.</p>' +
       renderTeamsConnect(data, "patient") +
       renderMonthCalendar(data, { side: "patient" }) +
@@ -3579,12 +3656,15 @@
         escapeHtml(visit.id) +
         '" data-well-chart-patient="' +
         escapeHtml(visit.patientId || "") +
+        '" data-well-chart-clinician="' +
+        escapeHtml(visit.clinicianId || "") +
         '">Open visit · ' +
         escapeHtml(visit.when || "") +
         " · " +
         escapeHtml(visit.reason || "Visit") +
         " · " +
         escapeHtml(visit.patientName || "Patient") +
+        (visit.clinicianName ? " · with " + escapeHtml(visit.clinicianName) : "") +
         "</p>";
     var lockText =
       access.ok && sectionId === "soap"

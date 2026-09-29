@@ -416,4 +416,47 @@ var mayaOwnedHold = cc.presentForRole(mondayHeld.held[0], "provider", "held");
 assert.strictEqual(mayaOwnedHold.owned, true);
 assert.ok(mayaOwnedHold.title.indexOf("Clinic huddle") >= 0);
 
+var friday = "2026-09-18";
+var clinicFriday = [
+  { id: "a1", when: "2026-09-18 09:30", patientId: "p1", patientName: "Alexa J. Thomas", reason: "Annual wellness", clinicianId: "emp-maya" },
+  { id: "a2", when: "2026-09-18 10:15", patientId: "p2", patientName: "Jordan Rivera", reason: "HTN follow-up", clinicianId: "emp-maya" },
+];
+var mayaDay = cc.daySchedule({
+  dateIso: friday,
+  clinicianId: "emp-maya",
+  appointments: clinicFriday,
+  connected: false,
+  patientId: "p1",
+  patientName: "Alexa J. Thomas",
+});
+var mayaNine = mayaDay.filter(function (row) { return row.time === "09:00"; })[0];
+var mayaNineThirty = mayaDay.filter(function (row) { return row.time === "09:30"; })[0];
+var mayaTen = mayaDay.filter(function (row) { return row.time === "10:00"; })[0];
+assert.strictEqual(mayaNine.open, true);
+assert.strictEqual(mayaNine.clinicianId, "emp-maya");
+assert.strictEqual(mayaNineThirty.open, false);
+assert.strictEqual(mayaNineThirty.kind, "own-visit");
+assert.strictEqual(mayaTen.open, false);
+assert.strictEqual(mayaTen.kind, "appointment");
+assert.ok(JSON.stringify(mayaDay).indexOf("Jordan") < 0, "doctor schedule leaked another patient's name");
+var jamesNine = cc.daySchedule({
+  dateIso: friday,
+  clinicianId: "emp-james",
+  appointments: clinicFriday,
+  connected: false,
+  patientId: "p1",
+  patientName: "Alexa J. Thomas",
+}).filter(function (row) { return row.time === "09:00"; })[0];
+assert.strictEqual(jamesNine.open, true);
+assert.strictEqual(jamesNine.clinicianId, "emp-james");
+var jamesNineThirty = cc.daySchedule({
+  dateIso: friday,
+  clinicianId: "emp-james",
+  appointments: clinicFriday,
+  connected: false,
+  patientId: "p1",
+  patientName: "Alexa J. Thomas",
+}).filter(function (row) { return row.time === "09:30"; })[0];
+assert.strictEqual(jamesNineThirty.kind, "own-visit", "the patient cannot book a second doctor over their own visit");
+
 console.log("well-calendar-connect: " + "ok");

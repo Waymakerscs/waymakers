@@ -7339,6 +7339,51 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   margin-bottom: 0.45rem;
 }
 
+.well-doc-schedules {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.65rem;
+}
+
+.well-doc-schedule h6 {
+  margin: 0 0 0.35rem;
+  font-size: 0.84rem;
+}
+
+.well-doc-schedule-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.well-sched-book,
+.well-sched-held {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: var(--radius-sm);
+  padding: 0.28rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.well-sched-book {
+  border: 1px solid var(--well-line);
+  background: #fff;
+  color: var(--well-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.well-sched-book-go {
+  font-weight: 700;
+  color: var(--well-teal);
+}
+
+.well-sched-held {
+  color: var(--well-muted);
+  background: #eef2f4;
+}
+
 .well-book .well-field label {
   font-size: 0.68rem;
 }
