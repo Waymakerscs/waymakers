@@ -10374,7 +10374,8 @@ textarea::placeholder { color: rgba(242, 246, 255, 0.48) !important; }
 .well-title,
 .jobs-title,
 .home-title,
-.desk-title {
+.desk-title,
+.plan-title {
   color: #fff !important;
   font-weight: 600;
   letter-spacing: -0.04em;
@@ -10770,7 +10771,8 @@ body {
 .well-title,
 .jobs-title,
 .home-title,
-.desk-title {
+.desk-title,
+.plan-title {
   color: #fff !important;
   font-family: var(--cgn-ui) !important;
   font-size: clamp(1.8rem, 4vw, 3.6rem) !important;
@@ -10852,7 +10854,8 @@ body {
   .well-title,
   .jobs-title,
   .home-title,
-  .desk-title { font-size: clamp(1.8rem, 10vw, 2.75rem) !important; }
+  .desk-title,
+  .plan-title { font-size: clamp(1.8rem, 10vw, 2.75rem) !important; }
 }
 
 /* Load-in identity: the brain is reserved for entry, not the working interface. */
@@ -11485,6 +11488,7 @@ body > * {
 #panel-well h2,
 #panel-well h3,
 #panel-desk h3,
+#panel-plan h3,
 #panel-home h3,
 #panel-pages h2,
 #panel-pages h3,
@@ -11500,7 +11504,8 @@ body > * {
 .jobs-title,
 .pages-title,
 .home-title,
-.desk-title {
+.desk-title,
+.plan-title {
   color: #000 !important;
   letter-spacing: -0.075em !important;
   text-shadow: 0 0 14px rgba(0, 0, 0, 0.14);
@@ -12497,6 +12502,7 @@ dt, dd, figcaption, time, address, cite, dfn, abbr, q, s, mark,
 .pages-title,
 .home-title,
 .desk-title,
+.plan-title,
 .jobs-dek,
 .jobs-role-note,
 .jobs-count,
@@ -12738,8 +12744,9 @@ textarea::placeholder {
   margin-top: 0.35rem;
 }
 
-/* DESK v1 — blank white page beside WELL. Title only. No body copy, cards, or widgets. */
-#panel-desk.desk-blank {
+/* DESK and PLAN — blank white pages. Title only. No body copy, cards, or widgets. */
+#panel-desk.desk-blank,
+#panel-plan.plan-blank {
   min-height: 70vh;
   margin: 0;
   padding: clamp(1rem, 2.5vw, 1.6rem);
@@ -12750,7 +12757,8 @@ textarea::placeholder {
   box-shadow: none !important;
 }
 
-.desk-title {
+.desk-title,
+.plan-title {
   margin: 0;
   font-size: clamp(1.8rem, 4vw, 3.6rem);
   font-weight: 720;
@@ -12759,7 +12767,8 @@ textarea::placeholder {
   text-transform: uppercase;
 }
 
-.tabs.tabs--chrome .tab-panels:has(#panel-desk:not([hidden])) {
+.tabs.tabs--chrome .tab-panels:has(#panel-desk:not([hidden])),
+.tabs.tabs--chrome .tab-panels:has(#panel-plan:not([hidden])) {
   background: #fff !important;
   background-color: #fff !important;
   background-image: none !important;

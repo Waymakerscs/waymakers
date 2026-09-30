@@ -10,8 +10,9 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
 
 - Header masthead: **WAYMAKERS** wordmark (glowing black on silvery holo) + tagline “A wellness concierge”
 - Signup / sign-in (WAYMAKERS Supabase)
-- Tabs: **WELL · DESK · PAGES · HOME · CAREER** (roles stay distinct)
+- Tabs: **WELL · PLAN · DESK · PAGES · HOME · CAREER** (roles stay distinct)
   - **WELL** — Patient chart (PHI stays in this browser) and Provider visit chart (SOAP only). Patient and Provider sign-ins are separate. The patient releases the same chart to the next doctor.
+  - **PLAN** — blank white page immediately to the right of WELL (title only, no body copy, cards, or widgets)
   - **DESK** — Waymakers-only blank white page beside WELL (v1; title only, no body copy, cards, or widgets)
   - **PAGES** — local directory of what’s available (`pages.js`). Listings appear only after the browser shares a location, and only within 25 miles of that point. Denied or unavailable location asks you to enable it and does not substitute Chicago or any other city. Live results are Google Places via `GET /api/pages` (Pages Function). The key is Cloudflare Pages env `GOOGLE_PLACES_API_KEY` and is never sent to the browser. Without that key the tab stays empty and says Google Places is not configured — the Chicago sample catalog is not shown as nearby. That catalog is offline/dev only: open `?pagesDemo=1` (session key `waymakers.pages.demo.v1`). It is labeled “Demo catalog only — not live Google Places,” still needs this device’s location, and still uses the 25-mile radius, so a 405 (Oklahoma) device does not see Chicago samples. Site `?demo=1` does not turn the catalog on. **Directions** is turn-by-turn: Apple Maps `?daddr=&dirflg=d` on iPhone, iPad, and desktop; Google Maps `dir_action=navigate` on Android. No usable street address means no Directions control.
   - **HOME** — empty placeholder (content TBD)
