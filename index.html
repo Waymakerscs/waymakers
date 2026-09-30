@@ -342,6 +342,93 @@
                     </div>
                     <p class="well-auth-side-note">Choose a side first. Patient is your own doctor appointments. Provider is work hours. Unlocking one side does not open the other.</p>
 
+                    <div class="well-provider-verify" data-well-provider-verify hidden>
+                      <p class="well-provider-verify-rule">
+                        A username and password do not open the Provider portal. Waymakers staff have to review a driver's license and licensure to perform the job, and record that Waymakers has hired you, before provider access opens.
+                      </p>
+                      <div class="well-provider-blocked" data-well-provider-blocked hidden role="alert">
+                        <strong>Provider access closed</strong>
+                        <p>This username and password do not open the Provider portal. Waymakers staff still need to review a driver's license, review licensure to perform the job, and record that Waymakers has hired this person.</p>
+                      </div>
+                      <div class="well-provider-verify-forms">
+                        <form class="well-provider-signup" data-well-provider-signup action="#" method="post" novalidate autocomplete="off">
+                          <h5>Create a provider username</h5>
+                          <p class="form-hint">Saving a username and password does not grant provider access. No document is uploaded.</p>
+                          <div class="form-group">
+                            <label for="well-provider-signup-username">New provider username</label>
+                            <input
+                              type="text"
+                              id="well-provider-signup-username"
+                              name="providerSignupUsername"
+                              autocomplete="off"
+                              autocapitalize="none"
+                              spellcheck="false"
+                              required
+                              placeholder="letters, numbers, dot, _ or -"
+                            >
+                          </div>
+                          <div class="form-group">
+                            <label for="well-provider-signup-password">Password</label>
+                            <input
+                              type="password"
+                              id="well-provider-signup-password"
+                              name="providerSignupPassword"
+                              autocomplete="new-password"
+                              required
+                            >
+                          </div>
+                          <div class="form-group">
+                            <label for="well-provider-signup-password2">Confirm password</label>
+                            <input
+                              type="password"
+                              id="well-provider-signup-password2"
+                              name="providerSignupPasswordConfirm"
+                              autocomplete="new-password"
+                              required
+                            >
+                          </div>
+                          <p class="well-auth-status" data-well-provider-signup-status hidden role="status" aria-live="polite"></p>
+                          <div class="form-actions well-auth-actions">
+                            <button type="submit" class="btn btn-secondary">Create username</button>
+                          </div>
+                        </form>
+                        <form class="well-provider-staff" data-well-provider-staff action="#" method="post" novalidate autocomplete="off">
+                          <h5>Waymakers staff verification</h5>
+                          <p class="form-hint">Staff checklist only. Do not upload a driver's license or licensure image. Nothing is sent to a server. All three must be recorded before a self-created username can sign in.</p>
+                          <div class="form-group">
+                            <label for="well-staff-username">Provider username</label>
+                            <input
+                              type="text"
+                              id="well-staff-username"
+                              data-well-staff-username
+                              autocomplete="off"
+                              autocapitalize="none"
+                              spellcheck="false"
+                              required
+                            >
+                          </div>
+                          <div class="well-provider-checks">
+                            <label for="well-staff-drivers-license">
+                              <input type="checkbox" id="well-staff-drivers-license" data-well-staff-check="driversLicense">
+                              Driver's license reviewed
+                            </label>
+                            <label for="well-staff-licensure">
+                              <input type="checkbox" id="well-staff-licensure" data-well-staff-check="licensure">
+                              Licensure reviewed
+                            </label>
+                            <label for="well-staff-hired">
+                              <input type="checkbox" id="well-staff-hired" data-well-staff-check="hired">
+                              Hired by Waymakers
+                            </label>
+                          </div>
+                          <p class="well-auth-status" data-well-provider-staff-status hidden role="status" aria-live="polite"></p>
+                          <div class="form-actions well-auth-actions">
+                            <button type="submit" class="btn btn-secondary">Save staff verification</button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+
                     <div class="well-auth-steps" data-well-auth-steps>
                       <span class="well-auth-step is-active" data-well-auth-step-indicator="1">1 · Credentials</span>
                       <span class="well-auth-step" data-well-auth-step-indicator="2">2 · 2FA</span>
@@ -591,6 +678,7 @@
   <script src="js/well-calendar-connect.js" defer></script>
   <script src="js/well-chart-flow.js" defer></script>
   <script src="js/well.js" defer></script>
+  <script src="js/provider-verification.js" defer></script>
   <script src="js/well-auth.js" defer></script>
   <script src="js/pages-directions.js" defer></script>
   <script src="js/pages-nearby.js" defer></script>

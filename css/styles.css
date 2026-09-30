@@ -6139,6 +6139,111 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
   color: var(--well-muted);
 }
 
+.well-app[data-well-side="provider"] .well-auth-card {
+  width: min(100%, 34rem);
+}
+
+.well-provider-verify[hidden],
+.well-provider-blocked[hidden] {
+  display: none !important;
+}
+
+.well-provider-verify {
+  margin: 0 0 0.95rem;
+  padding: 0.8rem 0.85rem 0.9rem;
+  border: 1px solid #c48a9e;
+  border-radius: 10px;
+  background: #fff8fb;
+}
+
+.well-provider-verify-rule {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  font-weight: 650;
+  color: #6e3048;
+}
+
+.well-provider-blocked {
+  margin: 0.75rem 0 0;
+  padding: 0.7rem 0.75rem;
+  border-radius: 8px;
+  background: #fdecec;
+  border: 1px solid #e8b0b0;
+  color: #8a3030;
+}
+
+.well-provider-blocked strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.92rem;
+}
+
+.well-provider-blocked p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.well-provider-verify h5 {
+  margin: 0.95rem 0 0.25rem;
+  font-size: 0.92rem;
+  color: var(--well-ink);
+}
+
+.well-provider-verify .form-hint {
+  margin: 0 0 0.65rem;
+}
+
+.well-provider-verify .form-group {
+  margin-bottom: 0.65rem;
+}
+
+.well-provider-verify .form-group label,
+.well-provider-checks label {
+  display: block;
+  margin-bottom: 0.28rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--well-ink);
+}
+
+.well-provider-verify input[type="text"],
+.well-provider-verify input[type="password"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--well-ink);
+  background: #fff;
+  border: 1px solid var(--well-line);
+  border-radius: 8px;
+}
+
+.well-provider-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0.2rem 0 0.7rem;
+}
+
+.well-provider-checks label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.well-provider-checks input {
+  margin-top: 0.15rem;
+}
+
+.well-app[data-well-auth-step="2"] .well-provider-verify-forms {
+  display: none;
+}
+
 .well-app.is-locked .well-side-toggle[hidden] {
   display: none !important;
 }

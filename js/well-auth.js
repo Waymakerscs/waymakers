@@ -24,6 +24,14 @@
  *
  * The chart behind the lock is still a local demo EHR. Not HIPAA.
  * PHI must not leave the browser.
+ *
+ * Provider access is not granted by creating a username and password.
+ * A self-created provider username stays in this browser
+ * (waymakers.provider.verification.v1). Waymakers staff record three checks
+ * there — driver's license reviewed, licensure reviewed, and hired — before
+ * that username can open the Provider portal. No identity-document image is
+ * stored or uploaded. Patient sign-in is unchanged. A provider username that
+ * was not created in this browser still uses POST /api/well-auth only.
  */
 (function () {
   "use strict";
@@ -48,7 +56,7 @@
     provider: {
       eyebrow: "Work hours",
       title: "Provider sign-in",
-      desc: "Work hours for the staff schedule. This opens the Provider portal only. Your own doctor appointments stay locked until you sign in on the Patient side. Separate from WAYMAKERS site sign-in.",
+      desc: "Work hours open only after Waymakers staff review a driver's license and licensure to perform the job, and record that Waymakers has hired you. A username and password alone do not open the Provider portal. Your own doctor appointments stay locked until you sign in on the Patient side.",
       unlock: "Unlock Provider",
       lock: "Lock Provider",
       chip: "Provider session",
@@ -117,6 +125,13 @@
         sessionStorage.removeItem(key);
         return null;
       }
+      if (side === "provider" && data.gate === "local-hired") {
+        var verify = window.WaymakersProviderVerification;
+        if (!verify || !verify.hasLocalPassword(data.user) || !verify.isCleared(data.user)) {
+          sessionStorage.removeItem(key);
+          return null;
+        }
+      }
       return data;
     } catch (e) {
       return null;
@@ -177,6 +192,9 @@
     });
     root.setAttribute("data-well-patient-auth", isAuthenticated("patient") ? "unlocked" : "locked");
     root.setAttribute("data-well-provider-auth", isAuthenticated("provider") ? "unlocked" : "locked");
+    var verifyPanel = $("[data-well-provider-verify]", root);
+    if (verifyPanel) verifyPanel.hidden = side !== "provider";
+    if (side !== "provider") hideProviderBlocked(root);
   }
 
   function revealSideToggle(root) {
@@ -274,8 +292,66 @@
     pending[side] = emptyPending();
   }
 
-  function unlock(root, username, side) {
+  function hideProviderBlocked(root) {
+    var banner = $("[data-well-provider-blocked]", root);
+    if (banner) banner.hidden = true;
+    if (root && root.getAttribute("data-well-provider-hire") === "closed") {
+      root.removeAttribute("data-well-provider-hire");
+    }
+  }
+
+  function showProviderBlocked(root) {
+    var banner = $("[data-well-provider-blocked]", root);
+    if (banner) {
+      banner.hidden = false;
+      if (banner.scrollIntoView) {
+        try {
+          banner.scrollIntoView({ block: "nearest", inline: "nearest" });
+        } catch (e) {}
+      }
+    }
+    if (root) root.setAttribute("data-well-provider-hire", "closed");
+    setStatus(
+      root,
+      "credentials",
+      "A username and password do not open the Provider portal. Waymakers staff must review your driver's license and your licensure to perform the job, and record that Waymakers has hired you.",
+      true
+    );
+  }
+
+  function randomLocalCode() {
+    var buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return String(100000 + (buf[0] % 900000));
+  }
+
+  function beginLocalProviderOtp(root, side, user) {
+    var nonce = randomLocalCode();
+    pending[side] = {
+      user: user,
+      challenge: "local." + nonce + "." + Date.now(),
+      otp: randomLocalCode(),
+      local: true,
+    };
+    hideProviderBlocked(root);
+    setStatus(root, "credentials", "");
+    setStep(root, 2);
+  }
+
+  function unlock(root, username, side, opts) {
+    opts = opts || {};
     side = normalizeSide(side) || currentSide(root);
+    if (opts.local && side === "provider") {
+      var verify = window.WaymakersProviderVerification;
+      if (!verify || !verify.hasLocalPassword(username) || !verify.isCleared(username)) {
+        clearPending(side);
+        if (currentSide(root) === side) {
+          setStep(root, 1);
+          showProviderBlocked(root);
+        }
+        return false;
+      }
+    }
     clearPending(side);
     purgeLegacy();
     writeSession(side, {
@@ -284,8 +360,14 @@
       side: side,
       at: Date.now(),
       factor: "password+otp",
-      note: "sessionStorage · this side only · password+otp via /api/well-auth · tab close ends it · soft TTL 4h",
+      gate: opts.local ? "local-hired" : "well-auth",
+      note: opts.local
+        ? "sessionStorage · provider · local password + one-time code after staff hire checklist · tab close ends it · soft TTL 4h"
+        : "sessionStorage · this side only · password+otp via /api/well-auth · tab close ends it · soft TTL 4h",
     });
+    if (opts.local && side === "provider") {
+      root.setAttribute("data-well-provider-hire", "open");
+    }
     if (currentSide(root) === side) showUnlocked(root);
     else paintCopy(root, currentSide(root));
     document.dispatchEvent(
@@ -293,6 +375,7 @@
         detail: { unlocked: true, user: username, side: side },
       })
     );
+    return true;
   }
 
   function lockSides(root, sides, opts) {
@@ -404,6 +487,145 @@
       });
     });
 
+    function staffUserInput() {
+      return $("[data-well-staff-username]", root);
+    }
+
+    function loadStaffChecks() {
+      var verify = window.WaymakersProviderVerification;
+      var input = staffUserInput();
+      var rec = verify && input ? verify.get(input.value) : null;
+      $all("[data-well-staff-check]", root).forEach(function (box) {
+        var key = box.getAttribute("data-well-staff-check");
+        var on = false;
+        if (rec && key === "driversLicense") on = !!rec.driversLicenseReviewed;
+        if (rec && key === "licensure") on = !!rec.licensureReviewed;
+        if (rec && key === "hired") on = !!rec.hired;
+        box.checked = on;
+      });
+    }
+
+    function readStaffFlags() {
+      function on(name) {
+        var el = $('[data-well-staff-check="' + name + '"]', root);
+        return !!(el && el.checked);
+      }
+      return {
+        driversLicenseReviewed: on("driversLicense"),
+        licensureReviewed: on("licensure"),
+        hired: on("hired"),
+      };
+    }
+
+    function setLocalStatus(el, msg, isError) {
+      if (!el) return;
+      el.hidden = !msg;
+      el.textContent = msg || "";
+      if (el.classList && el.classList.toggle) el.classList.toggle("is-error", !!isError);
+    }
+
+    var signupForm = $("[data-well-provider-signup]", root);
+    if (signupForm) {
+      signupForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var verify = window.WaymakersProviderVerification;
+        var statusEl = $("[data-well-provider-signup-status]", root);
+        if (!verify) {
+          setLocalStatus(statusEl, "Provider signup is not available in this browser.", true);
+          return;
+        }
+        var user = ($("#well-provider-signup-username", root) || {}).value;
+        var pass = String(($("#well-provider-signup-password", root) || {}).value || "");
+        var confirm = String(($("#well-provider-signup-password2", root) || {}).value || "");
+        if (pass !== confirm) {
+          setLocalStatus(statusEl, "Those passwords do not match. Nothing was saved.", true);
+          return;
+        }
+        verify.createApplicant(user, pass).then(function (result) {
+          if (!result || !result.ok) {
+            setLocalStatus(
+              statusEl,
+              (result && result.error) || "Could not save that username. Nothing was sent.",
+              true
+            );
+            return;
+          }
+          var signInUser = $("#well-auth-username", root);
+          if (signInUser) signInUser.value = result.user;
+          var staffUser = staffUserInput();
+          if (staffUser) staffUser.value = result.user;
+          loadStaffChecks();
+          var passInput = $("#well-provider-signup-password", root);
+          var pass2 = $("#well-provider-signup-password2", root);
+          if (passInput) passInput.value = "";
+          if (pass2) pass2.value = "";
+          hideProviderBlocked(root);
+          setLocalStatus(
+            statusEl,
+            "Username saved in this browser. A username and password do not open the Provider portal. Waymakers staff still need to review a driver's license and licensure, and record that Waymakers has hired you.",
+            false
+          );
+        });
+      });
+    }
+
+    var staffUser = staffUserInput();
+    if (staffUser) {
+      staffUser.addEventListener("change", loadStaffChecks);
+      staffUser.addEventListener("input", loadStaffChecks);
+    }
+
+    var staffForm = $("[data-well-provider-staff]", root);
+    if (staffForm) {
+      staffForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var verify = window.WaymakersProviderVerification;
+        var statusEl = $("[data-well-provider-staff-status]", root);
+        if (!verify) {
+          setLocalStatus(statusEl, "Staff verification is not available in this browser.", true);
+          return;
+        }
+        var result = verify.setStaffChecks((staffUserInput() || {}).value, readStaffFlags());
+        if (!result || !result.ok) {
+          setLocalStatus(statusEl, (result && result.error) || "Could not save staff verification.", true);
+          return;
+        }
+        if (
+          !result.cleared &&
+          result.record &&
+          result.record.hasPassword &&
+          !isAuthenticated("provider") &&
+          root.getAttribute("data-well-auth-state") === "unlocked" &&
+          currentSide(root) === "provider"
+        ) {
+          lockSides(root, ["provider"]);
+          showProviderBlocked(root);
+        }
+        if (result.cleared && result.record && result.record.hasPassword) {
+          hideProviderBlocked(root);
+          setLocalStatus(
+            statusEl,
+            "Staff verification saved. Driver's license reviewed, licensure reviewed, and hired by Waymakers. This provider may sign in with the username and password they created.",
+            false
+          );
+          return;
+        }
+        if (result.cleared) {
+          setLocalStatus(
+            statusEl,
+            "Staff verification saved for this username. A self-created username can sign in only after it has a password saved here and all three checks.",
+            false
+          );
+          return;
+        }
+        setLocalStatus(
+          statusEl,
+          "Saved. Provider access stays closed until driver's license, licensure, and hire are all recorded.",
+          false
+        );
+      });
+    }
+
     if (credForm) {
       credForm.addEventListener("submit", function (e) {
         e.preventDefault();
@@ -414,9 +636,42 @@
           setStatus(root, "credentials", "Enter your WELL username and password.", true);
           return;
         }
-        setBusy(root, true);
-        setStatus(root, "credentials", "Checking " + side + " sign-in…", false);
-        postAuth({ step: "credentials", side: side, username: user, password: pass })
+        var verify = window.WaymakersProviderVerification;
+        if (side === "provider" && verify && verify.hasLocalPassword(user)) {
+          setBusy(root, true);
+          hideProviderBlocked(root);
+          setStatus(root, "credentials", "Checking provider sign-in…", false);
+          verify
+            .passwordMatches(user, pass)
+            .then(function (matches) {
+              if (currentSide(root) !== side) return;
+              if (matches) {
+                if (!verify.isCleared(user)) {
+                  showProviderBlocked(root);
+                  return;
+                }
+                beginLocalProviderOtp(root, side, verify.normalizeUser(user));
+                return;
+              }
+              return submitServerCredentials(root, side, user, pass);
+            })
+            .catch(function () {
+              if (currentSide(root) !== side) return;
+              setStatus(root, "credentials", "WELL sign-in could not be completed.", true);
+            })
+            .then(function () {
+              setBusy(root, false);
+            });
+          return;
+        }
+        submitServerCredentials(root, side, user, pass);
+      });
+    }
+
+    function submitServerCredentials(root, side, user, pass) {
+      setBusy(root, true);
+      setStatus(root, "credentials", "Checking " + side + " sign-in…", false);
+      return postAuth({ step: "credentials", side: side, username: user, password: pass })
           .then(function (data) {
             if (!data.ok || !data.challenge || (data.side && data.side !== side)) {
               if (currentSide(root) === side) {
@@ -452,7 +707,6 @@
           .then(function () {
             setBusy(root, false);
           });
-      });
     }
 
     if (otpForm) {
@@ -470,6 +724,27 @@
         }
         if (!/^\d{6}$/.test(code)) {
           setStatus(root, "otp", "Enter the 6-digit verification code.", true);
+          return;
+        }
+        if (slot.local) {
+          if (side !== "provider") {
+            clearPending(side);
+            setStep(root, 1);
+            return;
+          }
+          var hired = window.WaymakersProviderVerification;
+          if (!hired || !hired.hasLocalPassword(slot.user) || !hired.isCleared(slot.user)) {
+            clearPending(side);
+            setStep(root, 1);
+            showProviderBlocked(root);
+            return;
+          }
+          if (code !== slot.otp) {
+            setStatus(root, "otp", "Wrong verification code.", true);
+            return;
+          }
+          var opened = unlock(root, slot.user, side, { local: true });
+          if (opened && currentSide(root) === side) setStatus(root, "otp", "");
           return;
         }
         setBusy(root, true);

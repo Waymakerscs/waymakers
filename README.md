@@ -134,6 +134,7 @@ Adapter: `js/well-calendar-connect.js` (`WellCalendarConnect.useAdapter` is the 
 - Browser config: `js/cognation-config.js` → `https://gjrxweezprhiosqewiah.supabase.co`
 - Site sign-in is WAYMAKERS Supabase. Local demo of the site shell is `?demo=1` only (`waymakers.demo.unlock.v1`). The public login gate has no Demo unlock control. That does not unlock WELL.
 - WELL has two second locks, one per portal. `POST /api/well-auth` requires `side` (`patient` or `provider`) on the password step and the one-time-code step. Challenge tickets are bound to that side. Unlocking Patient does not open Provider. No WELL password or fixed code ships in static assets. The chart is still a demo EHR, not HIPAA; PHI must not leave the browser.
+- Creating a provider username and password does not open the Provider portal. The application stays in this browser (`waymakers.provider.verification.v1`): a password hash and a Waymakers staff checklist (driver’s license reviewed, licensure reviewed, hired). No identity-document image is stored or uploaded. That username can sign in only after all three checks are recorded. Patient sign-in is unchanged. Provider usernames that were not created here still use only `/api/well-auth`.
 - Cloudflare Pages env (never commit the values):
 
   | Variable | Purpose |
