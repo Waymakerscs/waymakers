@@ -8,7 +8,7 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
 
 ## Landing
 
-- Header masthead: **WAYMAKERS** wordmark (glowing black on silvery holo) + tagline “A wellness concierge”
+- Header masthead: **WAYMAKERS** wordmark (glowing black on silvery holo) + quote “Where there is a will, we make a way.”
 - Signup / sign-in (WAYMAKERS Supabase)
 - Tabs: **WELL · PLAN · DESK · PAGES · HOME · CAREER** (roles stay distinct)
   - **WELL** — Patient chart (PHI stays in this browser) and Provider visit chart (SOAP only). Patient and Provider sign-ins are separate. The patient releases the same chart to the next doctor.
