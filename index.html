@@ -258,6 +258,7 @@
           <div class="app-topbar">
             <div role="tablist" aria-label="WAYMAKERS topics" class="tablist">
               <button type="button" role="tab" id="tab-well" aria-controls="panel-well" aria-selected="true" tabindex="0">WELL</button>
+              <button type="button" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">PLAN</button>
               <button type="button" role="tab" id="tab-desk" aria-controls="panel-desk" aria-selected="false" tabindex="-1">DESK</button>
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1">PAGES</button>
               <button type="button" role="tab" id="tab-home" aria-controls="panel-home" aria-selected="false" tabindex="-1">HOME</button>
@@ -457,7 +458,13 @@
               </div>
             </div>
 
-            <div role="tabpanel" id="panel-desk" class="desk-blank" aria-labelledby="tab-desk" hidden></div>
+            <div role="tabpanel" id="panel-plan" class="plan-blank" aria-labelledby="tab-plan" hidden>
+              <h3 class="plan-title">PLAN</h3>
+            </div>
+
+            <div role="tabpanel" id="panel-desk" class="desk-blank" aria-labelledby="tab-desk" hidden>
+              <h3 class="desk-title">DESK</h3>
+            </div>
 
             <div role="tabpanel" id="panel-pages" aria-labelledby="tab-pages" hidden>
               <div class="pages-shell" data-pages-shell>
