@@ -10,6 +10,8 @@
  * Missing keys or a partner block show a not-configured status — never invented listings.
  *
  * Not a company workspace (that’s WELL) and not a directory (that’s PAGES).
+ * Licensure, credentialing, degree, and resume files are a separate CAREER
+ * section (career-credentials.js). They stay in this browser.
  */
 (function () {
   "use strict";

@@ -31,7 +31,9 @@
     <div class="login-gate-panel">
       <div class="login-gate-brand login-gate-brand--splash">
         <p class="login-gate-tagline" id="login-gate-tagline" data-brand-tagline>“A wellness concierge”</p>
-        <span class="login-gate-brand-name" data-brand>WAYMAKERS</span>
+        <div class="wm-wordmark">
+          <span class="login-gate-brand-name" data-brand>WAYMAKERS</span>
+        </div>
       </div>
       <p class="login-gate-eyebrow">Welcome</p>
       <h2 id="login-gate-title">Sign in</h2>
@@ -215,24 +217,17 @@
           </select>
         </div>
 
-        <p id="login-status" class="login-status" hidden role="status" aria-live="polite"></p>
-
         <div class="form-actions login-form-actions">
+          <p id="login-status" class="login-status" hidden role="status" aria-live="polite"></p>
           <button type="submit" class="btn btn-primary login-submit-btn" data-login-submit>Sign in</button>
+          <p class="login-mode-toggle">
+            <button type="button" class="login-mode-link" data-login-mode-toggle>
+              Need an account? Sign up
+            </button>
+          </p>
+          <p class="form-hint login-demo-hint" data-login-demo-hint hidden>Sign in with the email and password you used to create your WAYMAKERS account.</p>
+          <p class="form-hint login-demo-storage-hint">Your account is secured by WAYMAKERS sign-in.</p>
         </div>
-        <p class="login-mode-toggle">
-          <button type="button" class="login-mode-link" data-login-mode-toggle>
-            Need an account? Sign up
-          </button>
-        </p>
-        <p class="login-demo-unlock-row">
-          <button type="button" class="btn btn-secondary login-demo-unlock" data-demo-unlock>Demo unlock</button>
-        </p>
-        <p class="form-hint login-demo-unlock-note">
-          Local demo — not production auth. Opens this browser session only. WELL keeps its own sign-in.
-        </p>
-        <p class="form-hint login-demo-hint" data-login-demo-hint hidden>Sign in with the email and password you used to create your WAYMAKERS account.</p>
-        <p class="form-hint login-demo-storage-hint">Your account is secured by WAYMAKERS sign-in.</p>
       </form>
       </div>
     </div>
@@ -242,11 +237,17 @@
     Local demo — not production auth / not HIPAA. This tab is not a production account. PHI must not leave the browser.
   </p>
 
-  <!-- Cognation-style masthead: wordmark + tagline only (silver holo / black glow). -->
+  <!-- Cognation-style masthead: tagline, wordmark, north star (silver holo / black glow). -->
   <section class="waymakers-masthead" aria-label="Waymakers">
     <div class="waymakers-masthead-inner">
       <p class="waymakers-masthead-kicker" data-brand-tagline>“A wellness concierge”</p>
-      <a class="waymakers-masthead-home" href="index.html" aria-label="Waymakers home" data-brand>WAYMAKERS</a>
+      <a class="waymakers-masthead-home wm-wordmark" href="index.html" aria-label="Waymakers home">
+        <span class="waymakers-masthead-word" data-brand>WAYMAKERS</span>
+        <span class="wm-north-star" aria-hidden="true">
+          <img class="wm-north-star-img" src="assets/wm-north-star.svg" alt="" width="200" height="200" decoding="async" draggable="false" />
+          <span class="wm-north-star-sheen"></span>
+        </span>
+      </a>
     </div>
   </section>
 
@@ -257,6 +258,7 @@
           <div class="app-topbar">
             <div role="tablist" aria-label="WAYMAKERS topics" class="tablist">
               <button type="button" role="tab" id="tab-well" aria-controls="panel-well" aria-selected="true" tabindex="0">WELL</button>
+              <button type="button" role="tab" id="tab-plan" aria-controls="panel-plan" aria-selected="false" tabindex="-1">PLAN</button>
               <button type="button" role="tab" id="tab-desk" aria-controls="panel-desk" aria-selected="false" tabindex="-1">DESK</button>
               <button type="button" role="tab" id="tab-pages" aria-controls="panel-pages" aria-selected="false" tabindex="-1">PAGES</button>
               <button type="button" role="tab" id="tab-home" aria-controls="panel-home" aria-selected="false" tabindex="-1">HOME</button>
@@ -456,6 +458,10 @@
               </div>
             </div>
 
+            <div role="tabpanel" id="panel-plan" class="plan-blank" aria-labelledby="tab-plan" hidden>
+              <h3 class="plan-title">PLAN</h3>
+            </div>
+
             <div role="tabpanel" id="panel-desk" class="desk-blank" aria-labelledby="tab-desk" hidden>
               <h3 class="desk-title">DESK</h3>
             </div>
@@ -522,6 +528,16 @@
                   </p>
                 </header>
 
+                <section class="jobs-credentials" data-jobs-credentials aria-labelledby="jobs-credentials-heading">
+                  <h4 class="jobs-credentials-title" id="jobs-credentials-heading">Credentials &amp; documents</h4>
+                  <p class="jobs-credentials-demo" role="note">Local demo. Each file stays in this browser only (up to 10 MB). Nothing is uploaded, emailed, or sent to an employer or a job board.</p>
+                  <p class="jobs-credentials-alert" data-jobs-credentials-alert hidden role="alert"></p>
+                  <div class="jobs-credentials-list" data-jobs-credentials-list>
+                    <p class="jobs-credentials-empty">Documents stay on this page once the browser is ready.</p>
+                  </div>
+                  <p class="jobs-credentials-status" data-jobs-credentials-status role="status" aria-live="polite"></p>
+                </section>
+
                 <div class="jobs-filter-row">
                   <label class="jobs-sr-only" for="jobs-company">Filter by company</label>
                   <select id="jobs-company" class="jobs-company" data-jobs-company aria-label="Filter by company"></select>
@@ -577,6 +593,7 @@
   <script src="js/login.js" defer></script>
   <script src="js/companies.js" defer></script>
   <script src="js/well-calendar-connect.js" defer></script>
+  <script src="js/well-chart-flow.js" defer></script>
   <script src="js/well.js" defer></script>
   <script src="js/well-auth.js" defer></script>
   <script src="js/pages-directions.js" defer></script>
@@ -585,5 +602,6 @@
   <script src="js/pages.js" defer></script>
   <script src="js/jobs-adapters.js" defer></script>
   <script src="js/jobs.js" defer></script>
+  <script src="js/career-credentials.js" defer></script>
 </body>
 </html>

@@ -1,16 +1,20 @@
 /**
  * WELL — WAYMAKERS demo patient chart / EHR-style shell.
  *
- * Two portals: Patient (fillable documentation + portal inbox/notes)
- *            | Provider (chart view; compose doctor messages + append-only notes)
+ * Two portals: Patient (owns PHI on their chart + releases it to a doctor)
+ *            | Provider (reads that chart for a visit; writes SOAP only)
  * sessionStorage: cognation.well.side = patient|provider
  * WELL sign-in is per side (js/well-auth.js). Switching portals does not
- * reuse the other side's session.
- * localStorage:   cognation.well.portal.v1  (demo chart + prefs — stays in this browser)
+ * reuse the other side's session. One side's unlock does not open the other.
+ * localStorage:   cognation.well.portal.v1  (patient chart PHI + prefs — this browser)
+ *                 cognation.well.soap.v1    (provider SOAP notes only — js/well-chart-flow.js)
  * IndexedDB:      cognation.well.applehealth.v1 (Apple Health export file bytes)
  *
+ * The open provider chart is the patient on the selected appointment.
+ * Patient PHI is not copied into the SOAP store. Releasing the chart to the
+ * next doctor keeps the same patient record; it does not empty it.
  * Doctor messages: provider → patient (compose on Provider portal).
- * Doctor notes: stored in the patient portal data; append-only / audit log — never deleted.
+ * Doctor notes: historical append-only log. New clinical write-up is SOAP.
  * Apple Health (v1): patient consent grant/revoke + manual export.zip/XML upload;
  *   consent + upload events are append-only in appleHealth.audit. Live HealthKit sync
  *   needs a native iOS app later — web UI stays honest about that.
@@ -41,8 +45,8 @@
     { id: "meds", label: "Meds" },
     { id: "allergies", label: "Allergies" },
     { id: "diagnoses", label: "Diagnoses" },
-    { id: "progress", label: "Progress note" },
     { id: "plan", label: "Care plan" },
+    { id: "soap", label: "SOAP" },
     { id: "applehealth", label: "Apple Health" },
   ];
 
@@ -60,7 +64,7 @@
   var APPLE_HEALTH_MAX_BYTES = 25 * 1024 * 1024; /* 25 MB demo cap */
 
   var DEMO_SEED = {
-    version: 6,
+    version: 7,
     patient: {
       name: "Alexa J. Thomas",
       dob: "1990-04-12",
@@ -235,9 +239,21 @@
       bookVisitType: "wellness",
       bookClinicianId: "emp-maya",
     },
+    /* Patient-owned shares. Releasing adds a doctor; it does not move or clear PHI. */
+    releases: [
+      {
+        id: "rel-maya",
+        clinicianId: "emp-maya",
+        clinicianName: "Dr. Maya Chen, MD",
+        at: "2026-09-01 09:00",
+        by: "patient",
+      },
+    ],
     prefs: {
       lastSection: "intake",
       selectedRosterId: "p1",
+      selectedAppointmentId: "a1",
+      activeClinicianId: "emp-maya",
       calYear: 2026,
       calMonth: 8,
       selectedCalDate: "2026-09-18",
@@ -521,8 +537,9 @@
       '<input type="time" id="well-sched-time" name="time" data-well-sched="time" value="09:00" required>' +
       "</div>" +
       extra +
+      '<p class="well-muted well-tiny">This names the visit you are booking. The open chart is the visit you select in the clinic schedule.</p>' +
       '<div class="well-field">' +
-      '<label for="well-sched-patient">Patient</label>' +
+      '<label for="well-sched-patient">Patient on this visit</label>' +
       '<select id="well-sched-patient" name="patientId" data-well-sched="patientId">' +
       '<option value="">— Type name below —</option>' +
       rosterOpts +
@@ -655,17 +672,38 @@
         base.chart.diagnoses = deepClone(DEMO_SEED.chart.diagnoses);
       }
     }
+    (function mergeReleases() {
+      var byClinician = {};
+      function takeRelease(list) {
+        (list || []).forEach(function (row) {
+          if (!row || !row.clinicianId || byClinician[row.clinicianId]) return;
+          byClinician[row.clinicianId] = {
+            id: row.id || "rel-" + row.clinicianId,
+            clinicianId: row.clinicianId,
+            clinicianName: row.clinicianName || "",
+            at: row.at || "",
+            by: "patient",
+          };
+        });
+      }
+      takeRelease(DEMO_SEED.releases);
+      takeRelease(raw.releases);
+      base.releases = Object.keys(byClinician).map(function (key) {
+        return byClinician[key];
+      });
+    })();
     base.appleHealth = mergeAppleHealthAppendOnly(base.appleHealth, raw.appleHealth);
     if (window.WellCalendarConnect) {
       base.calendarConnect = window.WellCalendarConnect.normalize(raw.calendarConnect);
     } else if (raw.calendarConnect && typeof raw.calendarConnect === "object") {
       base.calendarConnect = raw.calendarConnect;
     }
-    base.version = Math.max(6, Number(raw.version) || 0, Number(base.version) || 0);
+    base.version = Math.max(7, Number(raw.version) || 0, Number(base.version) || 0);
     return ensureCalPrefs(ensureAppleHealth(base));
   }
 
-  var PortalStore = {
+    var PortalStore = {
+    lastPhiWriteRejected: false,
     get: function () {
       try {
         var raw = localStorage.getItem(PORTAL_KEY);
@@ -675,8 +713,10 @@
         return deepClone(DEMO_SEED);
       }
     },
-    /** Persist portal. Doctor notes are append-only — deletes are blocked + audited. */
-    save: function (data) {
+    /** Persist portal. Doctor notes are append-only — deletes are blocked + audited.
+     *  actor "provider" cannot change patient PHI, releases, or Apple Health. */
+    save: function (data, opts) {
+      opts = opts || {};
       try {
         var prev = null;
         try {
@@ -773,9 +813,20 @@
         if (window.WellCalendarConnect) {
           data.calendarConnect = window.WellCalendarConnect.normalize(data.calendarConnect);
         }
-        data.version = Math.max(6, Number(data.version) || 0);
+        if (opts.actor === "provider" && window.WellChartFlow) {
+          var guarded = window.WellChartFlow.guardProviderPortalWrite(prev, data);
+          data.chart = guarded.portal.chart;
+          data.releases = guarded.portal.releases;
+          data.appleHealth = guarded.portal.appleHealth;
+          data.patient = guarded.portal.patient;
+          PortalStore.lastPhiWriteRejected = !!guarded.phiRejected;
+        } else {
+          PortalStore.lastPhiWriteRejected = false;
+        }
+        data.version = Math.max(7, Number(data.version) || 0);
+        var phiRejected = !!PortalStore.lastPhiWriteRejected;
         localStorage.setItem(PORTAL_KEY, JSON.stringify(data));
-        return true;
+        return !phiRejected;
       } catch (e) {
         return false;
       }
@@ -2436,30 +2487,79 @@
     );
   }
 
+  function renderDoctorDaySchedule(data, dateIso) {
+    var CC = window.WellCalendarConnect;
+    if (!CC) return "";
+    if (CC.isWeekend(dateIso)) {
+      return '<p class="well-muted well-tiny">Clinic is closed this day. Doctor schedules are weekdays.</p>';
+    }
+    var cc = CC.normalize(data.calendarConnect);
+    return (
+      '<div class="well-doc-schedules" data-well-doc-schedules>' +
+      CC.doctors()
+        .map(function (doc) {
+          var rows = CC.daySchedule({
+            dateIso: dateIso,
+            clinicianId: doc.id,
+            appointments: data.appointments || [],
+            connected: !!cc.connected,
+            patientId: "p1",
+            patientName: (data.patient && data.patient.name) || "",
+            includePatientOutlook: !!(cc.connected && cc.includePatientCalendar),
+            blockOwnVisits: true,
+          });
+          var body = rows
+            .map(function (row) {
+              if (row.open) {
+                return (
+                  '<button type="button" class="well-sched-book" data-well-book-slot="' +
+                  escapeHtml(row.dateIso + "|" + row.time) +
+                  '" data-well-book-doc="' +
+                  escapeHtml(doc.id) +
+                  '"><span>' +
+                  escapeHtml(row.label) +
+                  '</span><span class="well-sched-book-go">Book</span></button>'
+                );
+              }
+              var held = row.kind === "own-visit" ? "Your visit" : "Busy";
+              return (
+                '<span class="well-sched-held">' +
+                escapeHtml(row.label) +
+                " · " +
+                held +
+                "</span>"
+              );
+            })
+            .join("");
+          return (
+            '<section class="well-doc-schedule" data-well-doc-schedule="' +
+            escapeHtml(doc.id) +
+            '"><h6>' +
+            escapeHtml(doc.name) +
+            '</h6><div class="well-doc-schedule-slots">' +
+            body +
+            "</div></section>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
   function renderPatientBook(data) {
     var CC = window.WellCalendarConnect;
     if (!CC) return "";
     var cc = CC.normalize(data.calendarConnect);
+    var dateIso = (data.prefs && data.prefs.selectedCalDate) || "";
     return (
-      '<div class="well-book">' +
-      '<h5 class="well-cal-day-heading">Book a visit</h5>' +
+      '<div class="well-book" data-well-patient-book>' +
+      '<h5 class="well-cal-day-heading">Book on a doctor’s schedule</h5>' +
+      '<p class="well-muted well-tiny">Pick the doctor by booking an open time on their schedule for this day. That visit is the chart they open. Releasing your chart is separate, and it does not clear your chart.</p>' +
       '<div class="well-field"><label for="well-book-visit">Visit type</label>' +
       '<select id="well-book-visit" data-well-book-visit>' +
       visitOptions(cc.bookVisitType) +
       "</select></div>" +
-      '<div class="well-field"><label for="well-book-doc">Doctor</label>' +
-      '<select id="well-book-doc" data-well-book-clinician>' +
-      doctorOptions(cc.bookClinicianId) +
-      "</select></div>" +
-      '<div data-well-slot-mount>' +
-      renderSlotMount(data, "patient", {
-        clinicianId: cc.bookClinicianId,
-        visitType: cc.bookVisitType,
-        patientId: "p1",
-        patientName: (data.patient && data.patient.name) || "",
-        reason: (CC.visitById(cc.bookVisitType) || {}).label || "",
-      }) +
-      "</div>" +
+      renderDoctorDaySchedule(data, dateIso) +
       '<p class="well-muted well-tiny">' +
       escapeHtml(CC.CLINIC_HOURS_LABEL) +
       "</p></div>"
@@ -2545,13 +2645,13 @@
 
   function renderProviderApptRow(data, a) {
     var p = parseWhen(a.when);
-    var on = a.patientId && data.prefs && a.patientId === data.prefs.selectedRosterId;
+    var on = a.id && data.prefs && a.id === data.prefs.selectedAppointmentId;
     var detail =
       escapeHtml(a.reason || "") +
       (a.clinicianName ? " · " + escapeHtml(a.clinicianName) : "");
-    var open = a.patientId
-      ? '<button type="button" class="well-roster-btn well-appt-open" data-well-roster="' +
-        escapeHtml(a.patientId) +
+    var open = a.id
+      ? '<button type="button" class="well-roster-btn well-appt-open" data-well-visit="' +
+        escapeHtml(a.id) +
         '" aria-pressed="' +
         (on ? "true" : "false") +
         '"><span class="well-roster-time">' +
@@ -2596,8 +2696,8 @@
       : '<p class="well-muted well-tiny">No clinic visits on this day.</p>';
     return (
       '<div class="well-clinic-schedule" data-well-clinic-schedule>' +
-      '<h5 class="well-cal-day-heading">Clinic schedule · provider only</h5>' +
-      '<p class="well-privacy-note">Patient names and visit reasons stay in this list. They are not on the shared calendar overlay.</p>' +
+      '<h5 class="well-cal-day-heading">Clinic schedule · open a visit</h5>' +
+      '<p class="well-privacy-note">The chart follows the visit you open here. Patient names stay in this list. They are not on the shared calendar overlay.</p>' +
       body +
       "</div>"
     );
@@ -2730,6 +2830,7 @@
       cur.prefs.calMonth = parseInt(dp[1], 10) - 1;
     }
     if (fields.patientId) cur.prefs.selectedRosterId = fields.patientId;
+    cur.prefs.selectedAppointmentId = appt.id;
     cur.prefs.lastBookedId = appt.id;
     if (CC) {
       cur.calendarConnect = CC.setBookPrefs(cur.calendarConnect, {
@@ -2737,7 +2838,7 @@
         visitType: fields.visitType,
       });
     }
-    PortalStore.save(cur);
+    PortalStore.save(cur, { actor: fields.actor === "provider" ? "provider" : "patient" });
     return PortalStore.get();
   }
 
@@ -2802,6 +2903,7 @@
           clinicianId: clinicianId || draft.clinicianId,
           visitType: draft.visitType,
           source: "first-available",
+          actor: side,
         });
         rerenderSide(root, side);
       });
@@ -2820,7 +2922,7 @@
       clinicianId: draft.clinicianId,
       visitType: draft.visitType,
     });
-    PortalStore.save(cur);
+    PortalStore.save(cur, { actor: side === "provider" ? "provider" : "patient" });
     var fresh = PortalStore.get();
     draft = schedulingDraft(host, fresh, side);
     mount.innerHTML = renderSlotMount(fresh, side, draft);
@@ -2829,6 +2931,9 @@
 
   function bindSharedCalendar(root, host, side) {
     if (!host) return;
+    function saveSide(data) {
+      return PortalStore.save(data, { actor: side === "provider" ? "provider" : "patient" });
+    }
     function shiftMonth(delta) {
       var cur = ensureCalPrefs(PortalStore.get());
       cur.prefs.calMonth += delta;
@@ -2840,7 +2945,7 @@
         cur.prefs.calMonth = 0;
         cur.prefs.calYear += 1;
       }
-      PortalStore.save(cur);
+      saveSide(cur);
       rerenderSide(root, side);
     }
     var prevBtn = host.querySelector("[data-well-cal-prev]");
@@ -2865,7 +2970,7 @@
           cur.prefs.calYear = parseInt(parts[0], 10);
           cur.prefs.calMonth = parseInt(parts[1], 10) - 1;
         }
-        PortalStore.save(cur);
+        saveSide(cur);
         rerenderSide(root, side);
       });
     });
@@ -2881,7 +2986,7 @@
             : ((cur.patient && cur.patient.name) || "Patient") +
               (cur.patient && cur.patient.email ? " · " + cur.patient.email : "");
         cur.calendarConnect = CC.connect(cur.calendarConnect, label, nowStamp());
-        PortalStore.save(cur);
+        saveSide(cur);
         rerenderSide(root, side);
       });
     }
@@ -2892,7 +2997,7 @@
         if (!CC) return;
         var cur = PortalStore.get();
         cur.calendarConnect = CC.disconnect(cur.calendarConnect);
-        PortalStore.save(cur);
+        saveSide(cur);
         rerenderSide(root, side);
       });
     }
@@ -2906,7 +3011,7 @@
           input.getAttribute("data-well-emp-toggle"),
           input.checked
         );
-        PortalStore.save(cur);
+        saveSide(cur);
         rerenderSide(root, side);
       });
     });
@@ -2917,7 +3022,7 @@
         if (!CC) return;
         var cur = PortalStore.get();
         cur.calendarConnect = CC.setIncludePatientCalendar(cur.calendarConnect, selfToggle.checked);
-        PortalStore.save(cur);
+        saveSide(cur);
         rerenderSide(root, side);
       });
     }
@@ -2972,11 +3077,40 @@
           clinicianId: draft.clinicianId,
           visitType: draft.visitType,
           source: "manual",
+          actor: "provider",
         });
         rerenderSide(root, "provider");
       });
     }
     bindSlotButtons(root, host, side);
+    host.querySelectorAll("[data-well-book-slot]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (side !== "patient") return;
+        var parts = String(btn.getAttribute("data-well-book-slot") || "").split("|");
+        var clinicianId = btn.getAttribute("data-well-book-doc") || "";
+        var CC = window.WellCalendarConnect;
+        var visitEl = host.querySelector("[data-well-book-visit]");
+        var visitType = visitEl && visitEl.value ? visitEl.value : "";
+        var visit = CC && CC.visitById(visitType);
+        var cur = PortalStore.get();
+        var doc = CC && CC.staffById(clinicianId);
+        if (!doc || doc.kind !== "doctor") return;
+        commitAppointment(cur, {
+          date: parts[0],
+          time: parts[1],
+          patientId: "p1",
+          patientName: (cur.patient && cur.patient.name) || "",
+          reason: (visit && visit.label) || "Visit",
+          where: (cur.provider && cur.provider.clinic) || "",
+          clinicianId: clinicianId,
+          clinicianName: doc.name,
+          visitType: visitType,
+          source: "patient-schedule",
+          actor: "patient",
+        });
+        rerenderSide(root, "patient");
+      });
+    });
   }
 
   function renderUpcomingAppointments(data) {
@@ -3030,6 +3164,215 @@
     return html;
   }
 
+  function chartFlow() {
+    return window.WellChartFlow || null;
+  }
+
+  function selectedVisit(data) {
+    var id = data && data.prefs && data.prefs.selectedAppointmentId;
+    if (!id) return null;
+    var list = data.appointments || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === id) return list[i];
+    }
+    return null;
+  }
+
+  function activeClinician(data) {
+    var CC = window.WellCalendarConnect;
+    var id = (data && data.prefs && data.prefs.activeClinicianId) || "emp-maya";
+    var emp = CC && CC.staffById(id);
+    if (!emp || emp.kind !== "doctor") {
+      id = "emp-maya";
+      emp = CC && CC.staffById(id);
+    }
+    return { id: id, name: (emp && emp.name) || "Provider" };
+  }
+
+  function renderSoapNoteCard(note) {
+    return (
+      '<article class="well-soap-note">' +
+      '<header><strong>' +
+      escapeHtml(note.author || "Provider") +
+      "</strong> · " +
+      escapeHtml(note.at || "") +
+      (note.appointmentId ? ' <span class="well-muted">visit ' + escapeHtml(note.appointmentId) + "</span>" : "") +
+      "</header>" +
+      "<p><span>S</span> " +
+      escapeHtml(note.subjective || "—") +
+      "</p>" +
+      "<p><span>O</span> " +
+      escapeHtml(note.objective || "—") +
+      "</p>" +
+      "<p><span>A</span> " +
+      escapeHtml(note.assessment || "—") +
+      "</p>" +
+      "<p><span>P</span> " +
+      escapeHtml(note.plan || "—") +
+      "</p></article>"
+    );
+  }
+
+  function renderSoapReadOnly(data) {
+    var flow = chartFlow();
+    var notes = flow ? flow.notesForPatient(localStorage, "p1") : [];
+    var cards = notes.length
+      ? notes
+          .map(function (note) {
+            return renderSoapNoteCard(note);
+          })
+          .join("")
+      : '<p class="well-muted">No SOAP notes on your chart yet.</p>';
+    return (
+      '<div class="well-doc-form" data-well-soap-readonly>' +
+      '<p class="well-doc-lead">SOAP notes from your doctors (S/O/A/P). You can read them. You update vitals, meds, and the rest of the chart on the other tabs.</p>' +
+      cards +
+      "</div>"
+    );
+  }
+
+  function renderSoapEditor(data, visit, clinician) {
+    var flow = chartFlow();
+    var patientId = visit && visit.patientId ? visit.patientId : "";
+    var notes = flow && visit ? flow.notesForVisit(localStorage, visit.id) : [];
+    var others =
+      flow && patientId
+        ? flow.notesForPatient(localStorage, patientId).filter(function (note) {
+            return note.appointmentId !== visit.id;
+          })
+        : [];
+    var visitCards = notes.length
+      ? notes
+          .map(function (note) {
+            return renderSoapNoteCard(note);
+          })
+          .join("")
+      : '<p class="well-muted">No SOAP note on this visit yet.</p>';
+    var otherCards = others.length
+      ? '<h5 class="well-cal-day-heading">Other SOAP on this chart</h5>' +
+        others
+          .map(function (note) {
+            return renderSoapNoteCard(note);
+          })
+          .join("")
+      : "";
+    return (
+      '<div class="well-doc-form">' +
+      '<p class="well-doc-lead">SOAP for this visit only. Saving writes S/O/A/P. It does not store BP, meds, or other patient chart fields.</p>' +
+      visitCards +
+      '<form class="well-soap-form" data-well-soap-form>' +
+      '<label for="well-soap-s">Subjective</label>' +
+      '<textarea id="well-soap-s" data-well-soap="subjective" rows="3"></textarea>' +
+      '<label for="well-soap-o">Objective</label>' +
+      '<textarea id="well-soap-o" data-well-soap="objective" rows="3"></textarea>' +
+      '<label for="well-soap-a">Assessment</label>' +
+      '<textarea id="well-soap-a" data-well-soap="assessment" rows="3"></textarea>' +
+      '<label for="well-soap-p">Plan</label>' +
+      '<textarea id="well-soap-p" data-well-soap="plan" rows="3"></textarea>' +
+      '<div class="well-compose-actions">' +
+      '<button type="submit" class="btn btn-primary" data-well-soap-save>Save SOAP note</button>' +
+      '<span class="commune-status well-status" data-well-soap-status hidden role="status" aria-live="polite"></span>' +
+      "</div>" +
+      '<p class="well-muted well-tiny">Author · ' +
+      escapeHtml(clinician.name) +
+      " · visit " +
+      escapeHtml(visit.id) +
+      "</p></form>" +
+      otherCards +
+      "</div>"
+    );
+  }
+
+  function renderReleaseCard(data) {
+    var CC = window.WellCalendarConnect;
+    var doctors = CC ? CC.doctors() : [];
+    var released = data.releases || [];
+    var list = released.length
+      ? released
+          .map(function (row) {
+            return (
+              "<li>" +
+              escapeHtml(row.clinicianName || row.clinicianId) +
+              (row.at ? " · " + escapeHtml(row.at) : "") +
+              "</li>"
+            );
+          })
+          .join("")
+      : '<li class="well-muted">No doctors yet.</li>';
+    var options = doctors
+      .filter(function (doc) {
+        return !released.some(function (row) {
+          return row.clinicianId === doc.id;
+        });
+      })
+      .map(function (doc) {
+        return '<option value="' + escapeHtml(doc.id) + '">' + escapeHtml(doc.name) + "</option>";
+      })
+      .join("");
+    var form = options
+      ? '<form class="well-release-form" data-well-release-form>' +
+        '<label for="well-release-doc">Next doctor</label>' +
+        '<select id="well-release-doc" data-well-release-clinician>' +
+        options +
+        "</select>" +
+        '<button type="submit" class="btn btn-primary well-mini-btn">Release my chart</button>' +
+        "</form>"
+      : '<p class="well-muted well-tiny">Every clinic doctor in this demo already has your chart.</p>';
+    return (
+      '<section class="well-rail-card" data-well-release-card>' +
+      "<h4>Release chart to the next doctor</h4>" +
+      '<p class="well-muted well-tiny">You release your chart and the files on it. They stay in this browser. The next doctor reads that same record on a visit. Releasing does not copy them into provider storage and does not empty them.</p>' +
+      '<ul class="well-list">' +
+      list +
+      "</ul>" +
+      form +
+      "</section>"
+    );
+  }
+
+  function bindChartRelease(root, host) {
+    var form = host.querySelector("[data-well-release-form]");
+    if (!form || !chartFlow()) return;
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var sel = host.querySelector("[data-well-release-clinician]");
+      var clinicianId = sel ? sel.value : "";
+      var CC = window.WellCalendarConnect;
+      var doc = CC && CC.staffById(clinicianId);
+      var cur = PortalStore.get();
+      var recordBefore = chartFlow().patientRecordSnapshot(cur);
+      var result = chartFlow().releaseChart(cur, {
+        id: newId("rel"),
+        clinicianId: clinicianId,
+        clinicianName: doc ? doc.name : clinicianId,
+        at: nowStamp(),
+        by: "patient",
+      });
+      if (!result.ok) {
+        setStatus(root, result.reason || "Could not release the chart.", true);
+        return;
+      }
+      if (!PortalStore.save(result.portal, { actor: "patient" })) {
+        setStatus(root, "Could not save (storage full or blocked).", true);
+        return;
+      }
+      var saved = PortalStore.get();
+      renderPatient(root, saved);
+      var recordAfter = chartFlow().patientRecordSnapshot(saved);
+      if (JSON.stringify(recordBefore) !== JSON.stringify(recordAfter)) {
+        setStatus(root, "Release stopped — chart fields changed.", true);
+        return;
+      }
+      setStatus(
+        root,
+        "Chart and files released to " +
+          (doc ? doc.name : "that doctor") +
+          ". Your vitals, meds, and files are still on this chart.",
+        false
+      );
+    });
+  }
+
   function renderPatient(root, data, forceSection) {
     var host = root.querySelector("[data-well-patient-root]");
     if (!host) return;
@@ -3048,7 +3391,7 @@
       '<aside class="well-side-rail" aria-label="Schedule, appointments, and messages">' +
       '<section class="well-rail-card well-rail-card--schedule" data-well-schedule-card>' +
       "<h4>Schedule</h4>" +
-      '<p class="well-muted well-tiny">Shared clinic calendar · book the next open visit with your doctor.</p>' +
+      '<p class="well-muted well-tiny">Pick a doctor by booking an open time on their schedule.</p>' +
       '<p class="well-privacy-note">Shared overlay is Busy / Free except your own calendar. Other people\u2019s titles, names, reasons, and notes stay hidden. Your visits and your Outlook events show in full.</p>' +
       renderTeamsConnect(data, "patient") +
       renderMonthCalendar(data, { side: "patient" }) +
@@ -3073,6 +3416,7 @@
       '<button type="submit" class="btn btn-primary">Send to care team</button>' +
       "</div></form>" +
       '<p class="well-muted well-tiny">Doctor replies appear here · demo stays in this browser</p></section>' +
+      renderReleaseCard(data) +
       '<section class="well-rail-card">' +
       "<h4>Notes from your doctor</h4>" +
       renderDoctorNotesHtml(data.doctorNotes, { patientView: true }) +
@@ -3084,14 +3428,14 @@
     host.innerHTML =
       '<div class="well-chart well-chart--editable">' +
       chartBannerHtml(data.patient, "Fill chart / documentation") +
-      '<p class="well-role-hint">Patient side · fill and save chart documentation to this browser only.</p>' +
+      '<p class="well-role-hint">Patient side · you update vitals, meds, and the rest of your chart. Doctors write SOAP. Release the same chart to the next doctor — it stays in this browser.</p>' +
       sectionTabsHtml(sectionId, "well-pt") +
-      '<div class="well-chart-paper" data-well-chart-paper role="tabpanel" aria-labelledby="well-pt-tab-' +
+      '<div class="well-chart-paper" data-well-chart-paper data-well-phi-owner="patient" role="tabpanel" aria-labelledby="well-pt-tab-' +
       escapeHtml(sectionId) +
       '">' +
-      renderSectionBody(sectionId, data, true, "pt") +
+      (sectionId === "soap" ? renderSoapReadOnly(data) : renderSectionBody(sectionId, data, true, "pt")) +
       '<div class="well-doc-actions">' +
-      (sectionId === "applehealth"
+      (sectionId === "applehealth" || sectionId === "soap"
         ? ""
         : '<button type="button" class="btn btn-primary" data-well-save>Save to browser</button>' +
           '<button type="button" class="btn btn-secondary" data-well-reset-section>Reset section</button>') +
@@ -3130,6 +3474,9 @@
         var fresh = deepClone(DEMO_SEED);
         fresh.prefs.lastSection = sectionId;
         /* Doctor notes + Apple Health are append-only — never wiped by chart reset */
+        fresh.releases = deepClone(prev.releases || DEMO_SEED.releases);
+        fresh.prefs.selectedAppointmentId = prev.prefs && prev.prefs.selectedAppointmentId;
+        fresh.prefs.activeClinicianId = prev.prefs && prev.prefs.activeClinicianId;
         fresh.doctorNotes = deepClone(prev.doctorNotes || DEMO_SEED.doctorNotes);
         fresh.doctorNotesAudit = deepClone(
           prev.doctorNotesAudit || DEMO_SEED.doctorNotesAudit || []
@@ -3167,6 +3514,7 @@
     }
 
     WellCall.afterRender(root, "patient");
+    bindChartRelease(root, host);
     bindSharedCalendar(root, host, "patient");
 
     var ptForm = host.querySelector("[data-well-patient-compose]");
@@ -3187,23 +3535,26 @@
     data = ensureCalPrefs(data || PortalStore.get());
     var sectionId = data.prefs.lastSection || "intake";
     if (!CHART_SECTIONS.some(function (s) { return s.id === sectionId; })) sectionId = "intake";
-    var selectedId = data.prefs.selectedRosterId || "p1";
-    var selected =
-      (data.roster || []).filter(function (r) {
-        return r.id === selectedId;
-      })[0] || (data.roster && data.roster[0]);
-
-    /* Only Alexa chart is fillable/shared in this demo; others show stub summary */
-    var isPrimary = selected && selected.mrn === data.patient.mrn;
-    var viewPatient = isPrimary
+    var visit = selectedVisit(data);
+    var clinician = activeClinician(data);
+    var flow = chartFlow();
+    var access = flow
+      ? flow.providerMayViewChart(data, clinician.id, visit)
+      : { ok: false, reason: visit ? "no-local-chart" : "no-visit" };
+    var rosterRow = visit
+      ? (data.roster || []).filter(function (r) {
+          return r.id === visit.patientId;
+        })[0]
+      : null;
+    var viewPatient = access.ok
       ? data.patient
       : {
-          name: selected ? selected.name : "—",
-          dob: selected ? selected.dob : "",
-          mrn: selected ? selected.mrn : "—",
-          sex: "—",
-          pcp: data.provider.name,
-          preferredClinic: data.provider.clinic,
+          name: visit ? visit.patientName || (rosterRow && rosterRow.name) || "—" : "No visit open",
+          dob: rosterRow ? rosterRow.dob : "",
+          mrn: rosterRow ? rosterRow.mrn : "—",
+          sex: access.ok ? data.patient.sex : "—",
+          pcp: clinician.name,
+          preferredClinic: (data.provider && data.provider.clinic) || "",
         };
 
     var selectedDate = data.prefs.selectedCalDate;
@@ -3271,49 +3622,77 @@
       "</div></form>" +
       '<p class="well-muted well-tiny">Doctor → patient · visible in patient portal</p></section>' +
       '<section class="well-rail-card">' +
-      "<h4>Doctor notes (patient portal)</h4>" +
+      "<h4>Earlier doctor notes</h4>" +
       renderDoctorNotesHtml(data.doctorNotes, { patientView: false }) +
       renderAuditLogHtml(data.doctorNotesAudit) +
-      '<form class="well-compose" data-well-provider-compose-note>' +
-      '<label class="well-sr-only" for="well-pv-note">Add doctor note</label>' +
-      '<textarea id="well-pv-note" data-well-provider-note placeholder="Add a clinical note the patient can read (audit-only)…" rows="3"></textarea>' +
-      '<div class="well-compose-actions">' +
-      '<button type="submit" class="btn btn-primary">Post note to patient portal</button>' +
-      "</div></form>" +
-      '<p class="well-muted well-tiny">Append-only · patients cannot delete</p></section></aside>';
+      '<p class="well-muted well-tiny">New clinical notes are SOAP on the open visit. These older notes stay append-only.</p></section></aside>';
 
     var chartBody;
-    if (isPrimary) {
-      chartBody = renderSectionBody(sectionId, data, false, "pv");
-    } else if (selected) {
+    if (!visit) {
       chartBody =
-        '<div class="well-doc-form well-doc-form--stub">' +
-        "<p class=\"well-doc-lead\">Quick chart peek (demo stub — full fillable chart is linked to Alexa J. Thomas only).</p>" +
-        "<dl class=\"well-dl\">" +
-        "<div><dt>Visit reason</dt><dd>" +
-        escapeHtml(selected.reason) +
-        "</dd></div>" +
-        "<div><dt>MRN</dt><dd>" +
-        escapeHtml(selected.mrn) +
-        "</dd></div>" +
-        "<div><dt>DOB</dt><dd>" +
-        formatDob(selected.dob) +
-        "</dd></div>" +
-        "<div><dt>Note</dt><dd>Switch to the Alexa row to read the shared demo documentation filled on the Patient side.</dd></div>" +
-        "</dl></div>";
+        '<p class="well-doc-lead">Open a visit in the clinic schedule. The chart is that appointment’s patient.</p>';
+    } else if (!access.ok && access.reason === "no-local-chart") {
+      chartBody =
+        '<div class="well-doc-form" data-well-chart-held="patient">' +
+        '<p class="well-doc-lead">No chart in this browser for ' +
+        escapeHtml(visit.patientName || "this patient") +
+        ". Their chart stays with them. This screen does not keep a provider copy.</p></div>";
+    } else if (!access.ok) {
+      chartBody =
+        '<div class="well-doc-form" data-well-chart-held="patient">' +
+        "<p class=\"well-doc-lead\">" +
+        escapeHtml(visit.patientName || "This patient") +
+        " has not released this chart to " +
+        escapeHtml(clinician.name) +
+        ". The chart and files stay on the patient side. Switching doctors does not clear them. Only the patient can release them.</p></div>";
+    } else if (sectionId === "soap") {
+      chartBody = renderSoapEditor(data, visit, clinician);
     } else {
-      chartBody = '<p class="well-muted">Select a patient from the day schedule.</p>';
+      chartBody = renderSectionBody(sectionId, data, false, "pv");
     }
+
+    var visitLine = !visit
+      ? '<p class="well-visit-context" data-well-visit-context data-well-chart-access="no-visit">Open a visit in the clinic schedule.</p>'
+      : '<p class="well-visit-context" data-well-visit-context data-well-chart-access="' +
+        escapeHtml(access.ok ? "released" : access.reason || "closed") +
+        '" data-well-chart-visit="' +
+        escapeHtml(visit.id) +
+        '" data-well-chart-patient="' +
+        escapeHtml(visit.patientId || "") +
+        '" data-well-chart-clinician="' +
+        escapeHtml(visit.clinicianId || "") +
+        '">Open visit · ' +
+        escapeHtml(visit.when || "") +
+        " · " +
+        escapeHtml(visit.reason || "Visit") +
+        " · " +
+        escapeHtml(visit.patientName || "Patient") +
+        (visit.clinicianName ? " · with " + escapeHtml(visit.clinicianName) : "") +
+        "</p>";
+    var lockText =
+      access.ok && sectionId === "soap"
+        ? "SOAP only · saved on this visit. Patient BP and meds are not stored from this form."
+        : access.ok
+          ? "View only · the patient owns these fields. Writing BP or meds from this side is rejected."
+          : "Chart stays with the patient until they release it to you.";
 
     host.innerHTML =
       '<div class="well-chart well-chart--readonly">' +
-      chartBannerHtml(viewPatient, "Chart view only") +
-      '<p class="well-role-hint">Provider side · documentation is locked. Browse chart sections; editing happens on Patient. Use the calendar to schedule.</p>' +
-      (isPrimary ? sectionTabsHtml(sectionId, "well-pv") : "") +
-      '<div class="well-chart-paper well-chart-paper--locked" data-well-chart-paper role="tabpanel"' +
-      (isPrimary ? ' aria-labelledby="well-pv-tab-' + escapeHtml(sectionId) + '"' : "") +
+      chartBannerHtml(viewPatient, access.ok ? "Visit chart" : "Visit") +
+      '<div class="well-working-as"><label for="well-active-clinician">Working as</label>' +
+      '<select id="well-active-clinician" data-well-active-clinician>' +
+      doctorOptions(clinician.id) +
+      "</select>" +
+      '<p class="well-muted well-tiny">Switching doctors reads the same patient chart after the patient releases it. Nothing is copied into provider storage or cleared.</p></div>' +
+      '<p class="well-role-hint">Provider side · open a visit to read that patient’s chart. You can write SOAP for the visit. The patient updates BP, meds, and the rest.</p>' +
+      visitLine +
+      (access.ok ? sectionTabsHtml(sectionId, "well-pv") : "") +
+      '<div class="well-chart-paper well-chart-paper--locked" data-well-chart-paper data-well-phi-owner="patient" role="tabpanel"' +
+      (access.ok ? ' aria-labelledby="well-pv-tab-' + escapeHtml(sectionId) + '"' : "") +
       ">" +
-      '<div class="well-lock-banner" role="status">View only · fields locked in this demo</div>' +
+      '<div class="well-lock-banner" role="status">' +
+      escapeHtml(lockText) +
+      "</div>" +
       chartBody +
       "</div></div>" +
       rosterHtml;
@@ -3323,21 +3702,38 @@
         var next = btn.getAttribute("data-well-section");
         var cur = PortalStore.get();
         cur.prefs.lastSection = next;
-        PortalStore.save(cur);
-        renderProvider(root, cur);
+        PortalStore.save(cur, { actor: "provider" });
+        renderProvider(root, PortalStore.get());
       });
     });
 
-    if (isPrimary && sectionId === "applehealth") {
-      bindAppleHealthEditors(root, host);
+    var whoSelect = host.querySelector("[data-well-active-clinician]");
+    if (whoSelect) {
+      whoSelect.addEventListener("change", function () {
+        var cur = PortalStore.get();
+        var before = chartFlow() ? chartFlow().patientRecordSnapshot(cur) : null;
+        if (chartFlow()) cur = chartFlow().providerSwitch(cur, whoSelect.value).portal;
+        else cur.prefs.activeClinicianId = whoSelect.value;
+        PortalStore.save(cur, { actor: "provider" });
+        var saved = PortalStore.get();
+        if (before && JSON.stringify(before) !== JSON.stringify(chartFlow().patientRecordSnapshot(saved))) {
+          return;
+        }
+        renderProvider(root, saved);
+      });
     }
 
-    host.querySelectorAll("[data-well-roster]").forEach(function (btn) {
+    host.querySelectorAll("[data-well-visit]").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var cur = PortalStore.get();
-        cur.prefs.selectedRosterId = btn.getAttribute("data-well-roster");
-        PortalStore.save(cur);
-        renderProvider(root, cur);
+        var id = btn.getAttribute("data-well-visit");
+        cur.prefs.selectedAppointmentId = id;
+        var appt = (cur.appointments || []).filter(function (a) {
+          return a.id === id;
+        })[0];
+        if (appt && appt.patientId) cur.prefs.selectedRosterId = appt.patientId;
+        PortalStore.save(cur, { actor: "provider" });
+        renderProvider(root, PortalStore.get());
       });
     });
 
@@ -3349,10 +3745,57 @@
         cur.appointments = (cur.appointments || []).filter(function (a) {
           return a.id !== id;
         });
-        PortalStore.save(cur);
-        renderProvider(root, cur);
+        if (cur.prefs.selectedAppointmentId === id) cur.prefs.selectedAppointmentId = "";
+        PortalStore.save(cur, { actor: "provider" });
+        renderProvider(root, PortalStore.get());
       });
     });
+
+    var soapForm = host.querySelector("[data-well-soap-form]");
+    if (soapForm && flow) {
+      soapForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var status = host.querySelector("[data-well-soap-status]");
+        function say(msg, isError) {
+          if (!status) return;
+          status.hidden = !msg;
+          status.textContent = msg || "";
+          if (status.classList && status.classList.toggle) status.classList.toggle("is-error", !!isError);
+        }
+        var cur = PortalStore.get();
+        var open = selectedVisit(cur);
+        var who = activeClinician(cur);
+        if (!open || !open.patientId) {
+          say("Open a visit before writing SOAP.", true);
+          return;
+        }
+        var phiBefore = JSON.stringify(flow.phiSnapshot(cur));
+        var result = flow.appendSoap(localStorage, {
+          id: newId("soap"),
+          patientId: open.patientId,
+          appointmentId: open.id,
+          clinicianId: who.id,
+          author: who.name,
+          at: nowStamp(),
+          subjective: (host.querySelector('[data-well-soap="subjective"]') || {}).value || "",
+          objective: (host.querySelector('[data-well-soap="objective"]') || {}).value || "",
+          assessment: (host.querySelector('[data-well-soap="assessment"]') || {}).value || "",
+          plan: (host.querySelector('[data-well-soap="plan"]') || {}).value || "",
+        });
+        if (!result.ok) {
+          say(result.reason || "SOAP note was not saved.", true);
+          return;
+        }
+        if (phiBefore !== JSON.stringify(flow.phiSnapshot(PortalStore.get()))) {
+          say("SOAP save touched patient chart fields and was stopped.", true);
+          return;
+        }
+        cur = PortalStore.get();
+        cur.prefs.lastSection = "soap";
+        PortalStore.save(cur, { actor: "provider" });
+        renderProvider(root, PortalStore.get());
+      });
+    }
 
     bindSharedCalendar(root, host, "provider");
 
@@ -3378,16 +3821,6 @@
         var ta = host.querySelector("[data-well-provider-msg]");
         var body = ta ? ta.value : "";
         var cur = appendPortalMessage("provider", body);
-        renderProvider(root, cur);
-      });
-    }
-    var pvNoteForm = host.querySelector("[data-well-provider-compose-note]");
-    if (pvNoteForm) {
-      pvNoteForm.addEventListener("submit", function (e) {
-        e.preventDefault();
-        var ta = host.querySelector("[data-well-provider-note]");
-        var body = ta ? ta.value : "";
-        var cur = appendDoctorNote(body);
         renderProvider(root, cur);
       });
     }
@@ -4052,6 +4485,9 @@
     /* Ensure seed persists so provider sees patient fills after first visit */
     if (!localStorage.getItem(PORTAL_KEY)) {
       PortalStore.save(data);
+    }
+    if (window.WellChartFlow) {
+      window.WellChartFlow.ensureSeed(localStorage, data.chart && data.chart.progress);
     }
     renderPatient(root, data);
     renderProvider(root, data);

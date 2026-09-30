@@ -10,12 +10,13 @@ Cognation production (`cognation` / cognation-3md.pages.dev and Cognation GitHub
 
 - Header masthead: **WAYMAKERS** wordmark (glowing black on silvery holo) + tagline “A wellness concierge”
 - Signup / sign-in (WAYMAKERS Supabase)
-- Tabs: **WELL · DESK · PAGES · HOME · CAREER** (roles stay distinct)
-  - **WELL** — company/provider UI (EHR demo chart, roster, doctor→patient messages, audit-only doctor notes, Apple Health consent + export upload)
+- Tabs: **WELL · PLAN · DESK · PAGES · HOME · CAREER** (roles stay distinct)
+  - **WELL** — Patient chart (PHI stays in this browser) and Provider visit chart (SOAP only). Patient and Provider sign-ins are separate. The patient releases the same chart to the next doctor.
+  - **PLAN** — blank white page immediately to the right of WELL (title only, no body copy, cards, or widgets)
   - **DESK** — Waymakers-only blank white page beside WELL (v1; title only, no body copy, cards, or widgets)
   - **PAGES** — local directory of what’s available (`pages.js`). Listings appear only after the browser shares a location, and only within 25 miles of that point. Denied or unavailable location asks you to enable it and does not substitute Chicago or any other city. Live results are Google Places via `GET /api/pages` (Pages Function). The key is Cloudflare Pages env `GOOGLE_PLACES_API_KEY` and is never sent to the browser. Without that key the tab stays empty and says Google Places is not configured — the Chicago sample catalog is not shown as nearby. That catalog is offline/dev only: open `?pagesDemo=1` (session key `waymakers.pages.demo.v1`). It is labeled “Demo catalog only — not live Google Places,” still needs this device’s location, and still uses the 25-mile radius, so a 405 (Oklahoma) device does not see Chicago samples. Site `?demo=1` does not turn the catalog on. **Directions** is turn-by-turn: Apple Maps `?daddr=&dirflg=d` on iPhone, iPad, and desktop; Google Maps `dir_action=navigate` on Android. No usable street address means no Directions control.
   - **HOME** — empty placeholder (content TBD)
-  - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); Waymakers openings keyed by `companyId`, plus remote-only Indeed and LinkedIn
+  - **CAREER** — applicant board (UI label; panel ids / `#jobs` hash unchanged — `jobs.js` + `jobs-adapters.js`); Waymakers openings keyed by `companyId`, plus remote-only Indeed and LinkedIn. Credentials and documents (licensure, credentialing, college degree, resume) stay in this browser only (`career-credentials.js`)
 - Tower, Commune, badges, and widgets are **not** included
 
 ## Company identity (Well ↔ Jobs ↔ Pages)
@@ -76,6 +77,34 @@ The browser only needs `WAYMAKERSConfig.jobs.apiProxyPath` (`/api/jobs` in `js/c
 
 Logic checks: `node functions/api/jobs.test.mjs`. Details: `functions/README.md`. Redeploy Pages so `functions/` ships with the site.
 
+## CAREER · Credentials & documents (v1)
+
+On the CAREER tab, above the job filters. Not a new top-level tab.
+
+| Slot | Accepted files |
+| --- | --- |
+| Licensure | PDF or a photo (JPG, PNG, GIF, WEBP, BMP, TIFF, HEIC) |
+| Credentialing | PDF or a photo (same types) |
+| College degree | PDF or a photo (same types) |
+| Resume | PDF (preferred), DOC, or DOCX |
+
+Each slot holds one file. Add, replace, and remove update only that slot. Empty slots say nothing is saved yet.
+
+Files stay in this browser in IndexedDB (`waymakers.career.credentials.v1`), the same idea as the WELL Apple Health export. The section is labeled a local demo. There is no upload, email, background check, or job-board handoff. If IndexedDB is missing or the write fails, the section fails closed and saves nothing. Indeed and LinkedIn stay remote-only and fail closed as before.
+
+Logic checks: `node js/career-credentials.test.js`.
+
+## WELL · Chart flow (v1)
+
+Local demo EHR. Not HIPAA. PHI stays in this browser.
+
+| Store | Who writes | What |
+| --- | --- | --- |
+| `cognation.well.portal.v1` | Patient | Chart PHI (vitals, meds, allergies, and the rest) plus release shares |
+| `cognation.well.soap.v1` | Provider | SOAP notes only (S/O/A/P), tied to a visit |
+
+The patient picks a doctor by booking an open time on that doctor’s schedule. The provider opens the chart from that visit. They can read the patient’s chart and files after the patient has released them, and they can save SOAP for the visit. A provider save that includes BP, meds, or other PHI fields is rejected and is not written into the SOAP store. Only the patient releases the chart and files. The next doctor reads the same record. Switching providers does not wipe it, and a provider release cannot move it off the patient chart.
+
 ## WELL · Apple Health (v1)
 
 Patient portal tab **Apple Health**:
@@ -95,7 +124,7 @@ Patient and Provider both get a clinic calendar that behaves like a Microsoft Te
 - Toggle which employees are visible (Dr. Maya Chen, Dr. James Okonkwo, nurses, front desk). Disconnect hides the overlays and keeps those picks for the next connect.
 - **First available** suggests the next open 30-minute visits from weekday clinic hours (9:00–12:00 and 1:00–4:30), existing WELL appointments, and — once connected — that doctor's mock calendar plus the demo patient's own Outlook holds.
 - One-tap **Book** writes the visit into `cognation.well.portal.v1` (same portal store as the chart). It shows under Upcoming on the patient side and on the provider clinic schedule.
-- **Everyone’s calendar is private.** Shared overlays are Busy / Free only. A person sees full detail on their own events (the patient’s visits and Outlook, or the signed-in provider’s own mailbox). Other patients’ names and reasons, and other employees’ short names, subjects, notes, and attendees, are not on the overlay. Opaque pills say Busy (or Unavailable on a held slot) with a hatch — not a staff short name. First-available uses the same free/busy gate. Clinic workflow names stay in a separate list labeled **Clinic schedule · provider only**. Demo only — not HIPAA-certified — and the overlay is masked that way (`presentForRole`).
+- **Everyone’s calendar is private.** Shared overlays are Busy / Free only. A person sees full detail on their own events (the patient’s visits and Outlook, or the signed-in provider’s own mailbox). Other patients’ names and reasons, and other employees’ short names, subjects, notes, and attendees, are not on the overlay. Opaque pills say Busy (or Unavailable on a held slot) with a hatch — not a staff short name. First-available uses the same free/busy gate. Clinic workflow names stay in a separate list labeled **Clinic schedule · open a visit**. The open chart is that visit’s patient. Demo only — not HIPAA-certified — and the overlay is masked that way (`presentForRole`).
 
 Adapter: `js/well-calendar-connect.js` (`WellCalendarConnect.useAdapter` is the seam for a future Graph `calendarView`). Logic checks: `node js/well-calendar-connect.test.js`.
 
@@ -103,7 +132,7 @@ Adapter: `js/well-calendar-connect.js` (`WellCalendarConnect.useAdapter` is the 
 
 - Project ref: `gjrxweezprhiosqewiah` (org COG-NATION) — **separate from Cognation**
 - Browser config: `js/cognation-config.js` → `https://gjrxweezprhiosqewiah.supabase.co`
-- Site sign-in is WAYMAKERS Supabase. Local demo of the site shell is `?demo=1` or **Demo unlock** (`waymakers.demo.unlock.v1`). That does not unlock WELL.
+- Site sign-in is WAYMAKERS Supabase. Local demo of the site shell is `?demo=1` only (`waymakers.demo.unlock.v1`). The public login gate has no Demo unlock control. That does not unlock WELL.
 - WELL has two second locks, one per portal. `POST /api/well-auth` requires `side` (`patient` or `provider`) on the password step and the one-time-code step. Challenge tickets are bound to that side. Unlocking Patient does not open Provider. No WELL password or fixed code ships in static assets. The chart is still a demo EHR, not HIPAA; PHI must not leave the browser.
 - Cloudflare Pages env (never commit the values):
 

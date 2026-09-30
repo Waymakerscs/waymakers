@@ -1,6 +1,7 @@
 /**
  * WAYMAKERS login gate — Supabase email/password, or an explicit local demo.
- * Demo unlock is ?demo=1 or the "Demo unlock" control. It sets sessionStorage
+ * Local demo of the site shell is ?demo=1 only. There is no public Demo
+ * unlock control on the login gate. It sets sessionStorage
  * waymakers.demo.unlock.v1. No demo password ships in this file.
  *
  * After credentials succeed, if the account has 2 Tower profiles, show a
@@ -103,6 +104,11 @@
     statusEl.textContent = message || "";
     statusEl.classList.toggle("is-error", !!isError);
     statusEl.setAttribute("role", message ? "status" : "none");
+    if (message && typeof statusEl.scrollIntoView === "function") {
+      try {
+        statusEl.scrollIntoView({ block: "nearest", inline: "nearest" });
+      } catch (e) {}
+    }
   }
 
   function readLocalSession() {
@@ -303,6 +309,9 @@
       window.CognationSupabase.configured &&
       window.CognationSupabase.configured()
     ) {
+      if (!username || !password) {
+        return Promise.reject(new Error("Enter your email and password."));
+      }
       if (username.indexOf("@") <= 0) {
         return Promise.reject(new Error("Enter the email address for your WAYMAKERS account."));
       }
@@ -492,12 +501,6 @@
   };
 
   document.addEventListener("click", function (ev) {
-    var demoBtn = ev.target && ev.target.closest && ev.target.closest("[data-demo-unlock]");
-    if (demoBtn) {
-      ev.preventDefault();
-      enterDemo("button");
-      return;
-    }
     var btn = ev.target && ev.target.closest && ev.target.closest("[data-cognation-logout]");
     if (!btn) return;
     ev.preventDefault();

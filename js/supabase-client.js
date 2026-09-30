@@ -34,6 +34,18 @@
     } catch (e) {}
   }
 
+  function supabaseErrorText(body) {
+    if (!body) return "";
+    if (typeof body === "string") return body.trim();
+    /* GoTrue password grant returns msg (not message) for invalid_credentials. */
+    var text = body.msg || body.message || body.error_description || "";
+    if (text) return String(text);
+    if (body.error_code === "invalid_credentials" || body.error === "invalid_grant") {
+      return "Invalid login credentials";
+    }
+    return "";
+  }
+
   function request(path, options) {
     if (!configured()) return Promise.reject(new Error("Supabase is not configured."));
     options = options || {};
@@ -57,7 +69,7 @@
           body = text;
         }
         if (!response.ok) {
-          var error = new Error((body && body.message) || "Supabase request failed.");
+          var error = new Error(supabaseErrorText(body) || "Supabase request failed.");
           error.status = response.status;
           error.body = body;
           throw error;
