@@ -64,5 +64,5 @@ Two locks. They are not the same control.
 | CAREER credentials | Local demo. Licensure, credentialing, college degree, and resume stay in this browser (IndexedDB). No upload, email, or job-board handoff. Fails closed if storage is unavailable. |
 | Apple Health | Local demo · manual export only. No live HealthKit sync. |
 | HOME | Not live. Post-sign-in hub is still missing. |
-| DESK | Waymakers only, beside WELL. v1 is a blank white empty page. No copy, cards, or widgets. |
+| DESK | Waymakers only, beside WELL. v1 is a blank white page with the title DESK only. No body copy, cards, or widgets. |
 | Express session service | Stub. Not the Pages session. |
