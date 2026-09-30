@@ -7,7 +7,7 @@
   "use strict";
 
   var SITE_BRAND = "WAYMAKERS";
-  var SITE_TAGLINE = "“A wellness concierge”";
+  var SITE_TAGLINE = "Where there is a will, we make a way.";
 
   window.SITE_BRAND = SITE_BRAND;
   window.SITE_TAGLINE = SITE_TAGLINE;
