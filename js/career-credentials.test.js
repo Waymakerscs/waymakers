@@ -127,6 +127,10 @@ assert.ok(tablist.indexOf(">PAGES<") !== -1);
 assert.ok(tablist.indexOf(">HOME<") !== -1);
 assert.ok(tablist.indexOf(">CAREER<") !== -1);
 assert.ok(tablist.indexOf(">TRANSIT<") !== -1);
+var labels = (tablist.match(/>(WELL|PLAN|DESK|PAGES|HOME|CAREER|TRANSIT)</g) || []).map(function (label) {
+  return label.slice(1, -1);
+});
+assert.deepStrictEqual(labels, ["WELL", "PLAN", "DESK", "PAGES", "CAREER", "TRANSIT", "HOME"]);
 assert.ok(tablist.indexOf(">WELL<") < tablist.indexOf(">PLAN<") && tablist.indexOf(">PLAN<") < tablist.indexOf(">DESK<"), "PLAN sits immediately to the right of WELL");
 assert.ok(tablist.indexOf(">CAREER<") < tablist.indexOf(">TRANSIT<"));
 assert.strictEqual((tablist.slice(tablist.indexOf(">CAREER<"), tablist.indexOf(">TRANSIT<")).match(/role="tab"/g) || []).length, 1, "TRANSIT sits immediately to the right of CAREER");
