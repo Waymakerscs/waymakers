@@ -1,6 +1,6 @@
 /**
  * Accessible tabs (WAI-ARIA APG pattern).
- * Labels/ids live in HTML — WELL · PLAN · DESK · PAGES · HOME · CAREER (jobs panel ids/hash unchanged).
+ * Labels/ids live in HTML — WELL · PLAN · DESK · PAGES · HOME · CAREER · TRANSIT (jobs panel ids/hash unchanged).
  */
 (function () {
   "use strict";
