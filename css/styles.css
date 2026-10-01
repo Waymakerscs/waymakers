@@ -5771,7 +5771,8 @@ body.tower-radio-scroll .tower-radio-side { display: block; }
 }
 
 .home-shell {
-  padding: 0.35rem 0 1rem;
+  /* Same left inset as CAREER, DESK, PLAN, and TRANSIT (clamp 1rem–1.6rem). */
+  padding: 0.35rem clamp(1rem, 2.5vw, 1.6rem) 1rem;
 }
 
 .home-title {
