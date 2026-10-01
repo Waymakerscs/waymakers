@@ -10449,12 +10449,22 @@ button {
   .app-topbar {
     min-height: 4rem;
     padding: 0.7rem 1rem;
+    /* Eight tabs no longer fit. Pin the row to the bar so it scrolls from WELL. */
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .app-topbar .tablist {
+    grid-column: 1;
+    justify-self: stretch;
+    min-width: 0;
+    max-width: 100%;
     gap: 0.85rem;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .app-topbar-actions {
+    grid-column: 2;
   }
 
   .app-topbar .tablist::-webkit-scrollbar { display: none; }
