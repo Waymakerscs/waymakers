@@ -10377,6 +10377,7 @@ textarea::placeholder { color: rgba(242, 246, 255, 0.48) !important; }
 .home-title,
 .desk-title,
 .plan-title,
+.coach-title,
 .transit-title {
   color: #fff !important;
   font-weight: 600;
@@ -10448,12 +10449,22 @@ button {
   .app-topbar {
     min-height: 4rem;
     padding: 0.7rem 1rem;
+    /* Eight tabs no longer fit. Pin the row to the bar so it scrolls from WELL. */
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .app-topbar .tablist {
+    grid-column: 1;
+    justify-self: stretch;
+    min-width: 0;
+    max-width: 100%;
     gap: 0.85rem;
     overflow-x: auto;
     scrollbar-width: none;
+  }
+
+  .app-topbar-actions {
+    grid-column: 2;
   }
 
   .app-topbar .tablist::-webkit-scrollbar { display: none; }
@@ -10775,6 +10786,7 @@ body {
 .home-title,
 .desk-title,
 .plan-title,
+.coach-title,
 .transit-title {
   color: #fff !important;
   font-family: var(--cgn-ui) !important;
@@ -10859,6 +10871,7 @@ body {
   .home-title,
   .desk-title,
   .plan-title,
+  .coach-title,
   .transit-title { font-size: clamp(1.8rem, 10vw, 2.75rem) !important; }
 }
 
@@ -11493,6 +11506,7 @@ body > * {
 #panel-well h3,
 #panel-desk h3,
 #panel-plan h3,
+#panel-coach h3,
 #panel-transit h3,
 #panel-home h3,
 #panel-pages h2,
@@ -11511,6 +11525,7 @@ body > * {
 .home-title,
 .desk-title,
 .plan-title,
+.coach-title,
 .transit-title {
   color: #000 !important;
   letter-spacing: -0.075em !important;
@@ -12372,6 +12387,7 @@ dt, dd, figcaption, time, address, cite, dfn, abbr, q, s, mark,
 .home-title,
 .desk-title,
 .plan-title,
+.coach-title,
 .transit-title,
 .jobs-dek,
 .jobs-role-note,
@@ -12614,9 +12630,10 @@ textarea::placeholder {
   margin-top: 0.35rem;
 }
 
-/* DESK, PLAN, and TRANSIT — blank white pages. Title only. No body copy, cards, or widgets. */
+/* DESK, PLAN, COACH, and TRANSIT — blank white pages. Title only. No body copy, cards, or widgets. */
 #panel-desk.desk-blank,
 #panel-plan.plan-blank,
+#panel-coach.coach-blank,
 #panel-transit.transit-blank {
   min-height: 70vh;
   margin: 0;
@@ -12630,6 +12647,7 @@ textarea::placeholder {
 
 .desk-title,
 .plan-title,
+.coach-title,
 .transit-title {
   margin: 0;
   font-size: clamp(1.8rem, 4vw, 3.6rem);
@@ -12641,6 +12659,7 @@ textarea::placeholder {
 
 .tabs.tabs--chrome .tab-panels:has(#panel-desk:not([hidden])),
 .tabs.tabs--chrome .tab-panels:has(#panel-plan:not([hidden])),
+.tabs.tabs--chrome .tab-panels:has(#panel-coach:not([hidden])),
 .tabs.tabs--chrome .tab-panels:has(#panel-transit:not([hidden])) {
   background: #fff !important;
   background-color: #fff !important;

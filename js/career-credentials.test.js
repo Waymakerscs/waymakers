@@ -121,21 +121,24 @@ assert.ok(html.indexOf(cred.DEMO_NOTE) !== -1, "demo label matches the page");
 assert.ok(html.indexOf('src="js/career-credentials.js"') !== -1);
 var tablist = html.split('aria-label="WAYMAKERS topics"')[1].split("</div>")[0];
 assert.ok(tablist.indexOf(">WELL<") !== -1);
+assert.ok(tablist.indexOf(">COACH<") !== -1);
 assert.ok(tablist.indexOf(">PLAN<") !== -1);
 assert.ok(tablist.indexOf(">DESK<") !== -1);
 assert.ok(tablist.indexOf(">PAGES<") !== -1);
 assert.ok(tablist.indexOf(">HOME<") !== -1);
 assert.ok(tablist.indexOf(">CAREER<") !== -1);
 assert.ok(tablist.indexOf(">TRANSIT<") !== -1);
-var labels = (tablist.match(/>(WELL|PLAN|DESK|PAGES|HOME|CAREER|TRANSIT)</g) || []).map(function (label) {
+var labels = (tablist.match(/>(WELL|COACH|PLAN|DESK|PAGES|HOME|CAREER|TRANSIT)</g) || []).map(function (label) {
   return label.slice(1, -1);
 });
-assert.deepStrictEqual(labels, ["WELL", "PLAN", "DESK", "PAGES", "CAREER", "HOME", "TRANSIT"]);
-assert.ok(tablist.indexOf(">WELL<") < tablist.indexOf(">PLAN<") && tablist.indexOf(">PLAN<") < tablist.indexOf(">DESK<"), "PLAN sits immediately to the right of WELL");
+assert.deepStrictEqual(labels, ["WELL", "COACH", "PLAN", "DESK", "PAGES", "CAREER", "HOME", "TRANSIT"]);
+assert.strictEqual((tablist.slice(tablist.indexOf(">WELL<"), tablist.indexOf(">COACH<")).match(/role="tab"/g) || []).length, 1, "COACH sits immediately to the right of WELL");
+assert.strictEqual((tablist.slice(tablist.indexOf(">COACH<"), tablist.indexOf(">PLAN<")).match(/role="tab"/g) || []).length, 1, "PLAN sits immediately to the right of COACH");
+assert.ok(tablist.indexOf(">PLAN<") < tablist.indexOf(">DESK<"), "DESK stays to the right of PLAN");
 assert.ok(tablist.indexOf(">PAGES<") < tablist.indexOf(">CAREER<") && tablist.indexOf(">CAREER<") < tablist.indexOf(">HOME<"));
 assert.strictEqual((tablist.slice(tablist.indexOf(">PAGES<"), tablist.indexOf(">CAREER<")).match(/role="tab"/g) || []).length, 1, "CAREER sits immediately to the right of PAGES");
 assert.strictEqual((tablist.slice(tablist.indexOf(">HOME<"), tablist.indexOf(">TRANSIT<")).match(/role="tab"/g) || []).length, 1, "TRANSIT sits immediately to the right of HOME");
-assert.strictEqual((tablist.match(/role="tab"/g) || []).length, 7, "CAREER stays one of the existing tabs");
+assert.strictEqual((tablist.match(/role="tab"/g) || []).length, 8, "COACH is one more tab beside the existing set");
 assert.ok(tablist.indexOf("CREDENTIAL") === -1);
 var careerPanel = html.split('id="panel-jobs"')[1].split('id="panel-')[0];
 assert.ok(careerPanel.indexOf("data-jobs-credentials") !== -1, "section is inside CAREER");
