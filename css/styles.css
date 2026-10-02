@@ -12668,17 +12668,14 @@ textarea::placeholder {
 }
 
 
-/* Toolbar only. Cognation chrome, lilac-forward, two equal tones.
-   Cool #b89bff, warm #f0c8ff. No other page surface changes. */
+/* Toolbar only. White labels, lilac ombre the full width. No other page surface changes. */
 .app-topbar {
-  background:
-    radial-gradient(ellipse at 18% 0%, rgba(184, 155, 255, 0.55), transparent 62%),
-    radial-gradient(ellipse at 82% 0%, rgba(240, 200, 255, 0.48), transparent 62%),
-    linear-gradient(180deg, rgba(28, 18, 52, 0.55), rgba(18, 14, 40, 0.22)) !important;
+  background: linear-gradient(90deg, #e6e2f5 0%, #ddd8ec 50%, #d4cce8 100%) !important;
+  background-image: linear-gradient(90deg, #e6e2f5 0%, #ddd8ec 50%, #d4cce8 100%) !important;
   border: 0 !important;
-  border-bottom: 1px solid rgba(220, 200, 255, 0.34) !important;
-  color: rgba(245, 240, 255, 0.64) !important;
-  box-shadow: 0 18px 54px rgba(4, 6, 24, 0.22) !important;
+  border-bottom: 0 !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
 }
 
 .app-topbar .tablist {
@@ -12686,39 +12683,36 @@ textarea::placeholder {
   background-image: none !important;
   border-color: transparent !important;
   box-shadow: none !important;
-  color: inherit !important;
+  color: #ffffff !important;
 }
 
 .app-topbar .tablist [role="tab"],
-.app-topbar-shortcut {
-  color: rgba(245, 240, 255, 0.64) !important;
+.app-topbar-shortcut,
+.app-topbar .tablist [role="tab"][aria-selected="true"],
+.app-topbar-shortcut:hover,
+.app-topbar-shortcut:focus-visible {
+  color: #ffffff !important;
   background: transparent !important;
+  background-image: none !important;
   text-shadow: none !important;
-  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+  font-weight: 700 !important;
+}
+
+.app-topbar .tablist [role="tab"] {
+  border-bottom: 1px solid transparent !important;
 }
 
 .app-topbar .tablist [role="tab"][aria-selected="true"] {
-  color: #fff !important;
-  border-bottom: 1px solid #b89bff !important;
-  text-shadow:
-    0 0 12px rgba(184, 155, 255, 0.7),
-    0 0 12px rgba(240, 200, 255, 0.7) !important;
-}
-
-.app-topbar-shortcut:hover,
-.app-topbar-shortcut:focus-visible {
-  color: #fff !important;
-  border-bottom-color: transparent !important;
-  text-shadow:
-    0 0 12px rgba(184, 155, 255, 0.7),
-    0 0 12px rgba(240, 200, 255, 0.7) !important;
+  border-bottom: 1px solid #ffffff !important;
 }
 
 .app-topbar .app-logout-btn,
 .app-topbar-actions .app-logout-btn {
-  color: rgba(245, 240, 255, 0.64) !important;
-  background: rgba(255, 255, 255, 0.07) !important;
-  border-color: rgba(220, 200, 255, 0.34) !important;
+  color: #ffffff !important;
+  background: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
   text-shadow: none !important;
   box-shadow: none !important;
 }
